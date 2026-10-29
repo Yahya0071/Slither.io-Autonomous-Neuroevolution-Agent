@@ -245,6 +245,7 @@ test('trainStep with momentum builds velocity and accelerates weight updates alo
   const netNoMom = randomNet(0.1);
   const netWithMom = NeuralNetwork.fromJSON(netNoMom.export(), INPUTS);
 
+  const initialW2 = Array.from(netNoMom.weights[2]);
   const x = randInput();
   const t = [0.8, 1.0]; // consistent direction
 
@@ -255,10 +256,9 @@ test('trainStep with momentum builds velocity and accelerates weight updates alo
   }
 
   // With momentum, total displacement along consistent gradient is strictly greater
-  const diffNoMom = Math.abs(netNoMom.weights[2][0] - netNoMom.weights[2][0]);
   assert.ok(netWithMom._vW && netWithMom._vW[0].length > 0, 'velocity tensors allocated');
-  const wNoMomShift = Math.hypot(...netNoMom.weights[2]);
-  const wWithMomShift = Math.hypot(...netWithMom.weights[2]);
+  const wNoMomShift = Math.hypot(...Array.from(netNoMom.weights[2]).map((w, idx) => w - initialW2[idx]));
+  const wWithMomShift = Math.hypot(...Array.from(netWithMom.weights[2]).map((w, idx) => w - initialW2[idx]));
   assert.ok(wWithMomShift > wNoMomShift, `momentum should accelerate weight shift: ${wWithMomShift} > ${wNoMomShift}`);
 });
 

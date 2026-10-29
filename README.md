@@ -1,6 +1,6 @@
-# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.9.0 — Grandmaster Combat & Failure-Trauma Filter Edition)
+# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.0 — Forensic Deductor & Pathfinder Flight Recorder Edition)
 
-A master hybrid agent that plays in the real, official [Slither.io](https://slither.io) game. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, and an **Apex Tactical Combat State Machine** equipped with **Semantic Object Radar Perception, Pocket Shield Defense, Anti-Encirclement Slit Breaching, and Kinetic Boost Clearance**.
+A master hybrid agent that plays in the real, official [Slither.io](https://slither.io) game. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, an **Apex Tactical Combat State Machine**, and a **Forensic Deductor & Pathfinder Flight Recorder** that records every encounter, breadcrumb path, and root-cause death autopsy directly into exported checkpoints.
 
 Synthesized from the best breakthroughs across the 4 most prominent open-source Slither.io AI repositories:
 - **`dzaczek/slbot`**: Apex Predator Lead Interception Strike ($\tau$-kinematics) & Active Exploratory Scanning
@@ -30,7 +30,8 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`extension/`](./extension)** | Chrome / Edge Extension (Manifest V3) that injects the agent automatically. [`extension/agent.js`](./extension/agent.js) is **generated**. |
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
-| **[`tests/`](./tests)** | Node test suite: 90 unit and behavioural tests (kinematics, combat stances, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense). |
+| **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
+| **[`tests/`](./tests)** | Node test suite: 100 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -155,6 +156,7 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
 | **`[T]`** or **`[B]`** | **Toggle Autopilot / Teacher** | Switch between autonomous AI driving and human teacher shadowing. |
 | **`[V]`** | **Toggle Vision Rays** | Show/hide the real-time neon raycaster and food sector radar canvas. |
 | **`[R]`** | **Toggle Auto-Respawn** | Automatically click play and re-enter games 24/7 upon death. |
+| **`[O]`** | **View Death Autopsy** | Print a full forensic death autopsy report with killer profile & pre-crash telemetry to DevTools console. |
 | **`[A]`** | **Load Apex Preset** | Instantly load pre-trained Gen 100 Champion (168 kills, 1.08M lessons, 37.1k floor) with overwrite protection. |
 | **`[X]`** | **Reset Brain** | Wipe stored champion weights and restart evolution at Generation 1. |
 | **`[E]`** | **Export Brain** | Download complete JSON checkpoint backup of current brain and training state. |
@@ -168,14 +170,16 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 90 unit and behavioural tests (flight simulator, combat stances, neuroevolution)
+npm test        # 100 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
+npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 90 tests cover
+### What the 100 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |
 | **Tactical Combat** | Minkowski dynamic clearance & Behemoth evasion (`🛡️ DEFEND`); Anti-Encirclement Slit Breaching (`BREACH`); kinetic enemy boost velocity clearance expansion; Slipstream wake drafting; semantic object radar dampening on own body shield (`'self'`); Pocket Shield Defense against enemy head attacks; predator dynamic lead sprint (`⚔️ ATTACK`); defensive coil fortress (`🌀 COIL`); gapless offensive boa constrictor with Third-Party Perimeter Guard (`🐍 CONSTRICT`); post-kill corpse loot vacuum with "The Cross" perpendicular sweep (`🍖 VACUUM`); Angular Boost Gating ($R_{\text{turn}} = v/\omega$); fleeing chase pellet lead interception; Emergency Escape Sprint; Apex dominance; death wall repulsion. |
+| **Flight Recorder & Autopsy** | 60-frame rolling FIFO buffer; automatic death root cause classification (`ARENA_WALL`, `HEAD_ON_RAM`, `FLANK_CUTOFF`, `ENCIRCLED_TRAP`, `BOOST_STARVATION`); pathfinder breadcrumb coordinate downsampling; stance duty cycle percentages; arena spatial zone distribution (center/midfield/perimeter); milestone growth timeline; checkpoint telemetry serialization. |
 | **Mass & Boost Economy** | No boosting for plain pellets; unsafe sprint rejection; Mass-ROI boost governor; length preservation. |
 | **Perception** | 1,200px corpse radar; dense 300-segment body sampling with zero ray tunneling; forward-only obstacle urgency. |
 | **Kill Recognition** | Vanished nearby enemies register confirmed kills, increment live HUD counter, and award $+500$ fitness. |

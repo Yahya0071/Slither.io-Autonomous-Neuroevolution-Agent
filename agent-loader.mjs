@@ -69,6 +69,7 @@ export class MemoryStorage {
  */
 export function loadAgent({ storage = new MemoryStorage(), window: win = {}, collectLogs = false, clock } = {}) {
   const nnSrc = extractClass(sourceCode, 'NeuralNetwork');
+  const recorderSrc = extractClass(sourceCode, 'FlightRecorder');
   const agentSrc = extractClass(sourceCode, 'SlitherMLAgent');
   const storageKey = readStorageKey(sourceCode);
 
@@ -91,14 +92,16 @@ export function loadAgent({ storage = new MemoryStorage(), window: win = {}, col
      if (typeof pageWindow === 'undefined') { var pageWindow = window; }
      const STORAGE_KEY = ${JSON.stringify(storageKey)};
      ${nnSrc}
+     ${recorderSrc}
      ${agentSrc}
-     return { NeuralNetwork, SlitherMLAgent };`,
+     return { NeuralNetwork, FlightRecorder, SlitherMLAgent };`,
   );
 
-  const { NeuralNetwork, SlitherMLAgent } = factory(storage, win, clock ?? performance, shimConsole, win);
+  const { NeuralNetwork, FlightRecorder, SlitherMLAgent } = factory(storage, win, clock ?? performance, shimConsole, win);
 
   return {
     NeuralNetwork,
+    FlightRecorder,
     SlitherMLAgent,
     storage,
     window: win,

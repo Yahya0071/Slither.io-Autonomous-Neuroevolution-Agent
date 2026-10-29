@@ -1,0 +1,288 @@
+/**
+ * Flight Recorder & Forensic Deductor Unit Tests
+ *
+ * Verifies:
+ * 1. Rolling FIFO buffer records state frames and stance duty cycles.
+ * 2. Autopsy deduction classifies ARENA_WALL, HEAD_ON_RAM, FLANK_CUTOFF, ENCIRCLED_TRAP, BOOST_STARVATION.
+ * 3. Compact pathfinder breadcrumbs downsample coordinates at regular intervals.
+ * 4. Growth milestones and spatial zone occupancy calculations.
+ * 5. Checkpoint serialization round-trips telemetry without data loss.
+ * 6. SlitherMLAgent evaluate updates flight recorder and onDeath creates autopsy.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadAgent, MemoryStorage } from '../agent-loader.mjs';
+
+test('FlightRecorder initializes cleanly with expected default state', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  assert.equal(rec.totalFrames, 0);
+  assert.equal(rec.frameBuffer.length, 0);
+  assert.equal(rec.waypoints.length, 0);
+  assert.equal(rec.lastDeathAutopsy, null);
+  assert.deepEqual(rec.growthMilestones, {});
+});
+
+test('FlightRecorder.recordFrame accumulates frames, zone counts, and stance duty cycles', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder({ bufferCapacity: 10 });
+
+  // Record 12 frames in CENTER zone with FORAGE stance
+  for (let i = 0; i < 12; i++) {
+    rec.recordFrame({
+      t: i * 0.1,
+      x: 100,
+      y: 100,
+      sp: 5.9,
+      score: 50 + i * 10,
+      stance: 'FORAGE',
+      normWallDist: 0.1
+    });
+  }
+
+  assert.equal(rec.totalFrames, 12);
+  assert.equal(rec.frameBuffer.length, 10, 'FIFO buffer should cap at capacity');
+  assert.equal(rec.zoneCounts.center, 12);
+  assert.equal(rec.zoneCounts.perimeter, 0);
+
+  const duties = rec._calculateStanceDutyCycles();
+  assert.equal(duties.FORAGE, '100.0%');
+
+  const zones = rec._calculateZoneDistribution();
+  assert.equal(zones.center, '100.0%');
+});
+
+test('FlightRecorder.deduceDeathAutopsy classifies ARENA_WALL near boundary', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  rec.recordFrame({
+    t: 10.0,
+    x: 21500,
+    y: 0,
+    sp: 5.9,
+    score: 200,
+    stance: 'DEFEND',
+    normWallDist: 0.98,
+    threatDist: 500,
+    threatType: 'wall'
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 10.0,
+    finalScore: 200,
+    peakLength: 20,
+    generation: 2,
+    episode: 1
+  });
+
+  assert.equal(autopsy.cause, 'ARENA_WALL');
+  assert.equal(autopsy.fatalStance, 'DEFEND');
+  assert.ok(autopsy.confidence >= 0.9);
+  assert.equal(rec.lastDeathAutopsy.cause, 'ARENA_WALL');
+  assert.equal(rec.recentEpisodes.length, 1);
+});
+
+test('FlightRecorder.deduceDeathAutopsy classifies HEAD_ON_RAM against larger predator', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  rec.recordFrame({
+    t: 25.4,
+    x: 0,
+    y: 0,
+    sp: 6.2,
+    score: 300,
+    stance: 'DEFEND',
+    normWallDist: 0.2,
+    threatDist: 28, // within 2.8 * headRadius (14 * sqrt(20) ~ 62)
+    threatType: 'head',
+    threatAngle: 0.1, // facing forward
+    threatMassRatio: 1.6, // significantly larger
+    threatSpeed: 9.0
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 25.4,
+    finalScore: 300,
+    peakLength: 30,
+    generation: 5,
+    episode: 2
+  });
+
+  assert.equal(autopsy.cause, 'HEAD_ON_RAM');
+  assert.equal(autopsy.killerProfile.type, 'head');
+  assert.equal(autopsy.killerProfile.massRatio, 1.6);
+});
+
+test('FlightRecorder.deduceDeathAutopsy classifies FLANK_CUTOFF on high-speed enemy body', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  rec.recordFrame({
+    t: 15.0,
+    x: 1000,
+    y: 1000,
+    sp: 5.9,
+    score: 150,
+    stance: 'DEFEND',
+    normWallDist: 0.3,
+    threatDist: 35,
+    threatType: 'body',
+    threatSpeed: 10.5 // boosting enemy snake cutting across
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 15.0,
+    finalScore: 150,
+    peakLength: 15,
+    generation: 3,
+    episode: 1
+  });
+
+  assert.equal(autopsy.cause, 'FLANK_CUTOFF');
+});
+
+test('FlightRecorder.deduceDeathAutopsy classifies ENCIRCLED_TRAP during COIL stance', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  rec.recordFrame({
+    t: 40.0,
+    x: 200,
+    y: 200,
+    sp: 5.9,
+    score: 800,
+    stance: 'COIL',
+    normWallDist: 0.2,
+    threatDist: 40,
+    threatType: 'body'
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 40.0,
+    finalScore: 800,
+    peakLength: 80,
+    generation: 10,
+    episode: 1
+  });
+
+  assert.equal(autopsy.cause, 'ENCIRCLED_TRAP');
+});
+
+test('FlightRecorder.deduceDeathAutopsy classifies BOOST_STARVATION when boosting at zero score', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  rec.recordFrame({
+    t: 35.0,
+    x: 500,
+    y: 500,
+    sp: 11.0,
+    score: 10,
+    stance: 'FORAGE',
+    isBoosting: true,
+    normWallDist: 0.3,
+    threatDist: 300,
+    threatType: 'none'
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 35.0,
+    finalScore: 10,
+    peakLength: 500,
+    generation: 4,
+    episode: 3
+  });
+
+  assert.equal(autopsy.cause, 'BOOST_STARVATION');
+});
+
+test('Pathfinder breadcrumbs downsamples waypoints and growth milestones', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  // Record 10 seconds of movement
+  for (let s = 0; s < 100; s++) {
+    const t = s * 0.1;
+    rec.recordFrame({
+      t,
+      x: s * 10,
+      y: s * 5,
+      score: s * 60, // reaches 500, 1000, 2500, 5000
+      stance: s < 50 ? 'FORAGE' : 'ATTACK'
+    });
+  }
+
+  // Waypoints logged every 2.5s -> at ~0s, 2.5s, 5.0s, 7.5s (4 waypoints)
+  assert.ok(rec.waypoints.length >= 4, `expected >= 4 waypoints, got ${rec.waypoints.length}`);
+  assert.equal(rec.waypoints[0][4], 'FORAGE');
+
+  // Growth milestones
+  assert.ok(rec.growthMilestones['500'], 'should have logged milestone 500');
+  assert.ok(rec.growthMilestones['1000'], 'should have logged milestone 1000');
+  assert.ok(rec.growthMilestones['2500'], 'should have logged milestone 2500');
+  assert.ok(rec.growthMilestones['5000'], 'should have logged milestone 5000');
+});
+
+test('Checkpoint persistence: telemetry is serialized into checkpoint and restored via applySavedState', () => {
+  const storage = new MemoryStorage();
+  const harness = loadAgent({ storage });
+  const agent = harness.newAgent();
+  agent.resetBrain();
+
+  // Populate some telemetry in agent's flight recorder
+  agent.flightRecorder.recordFrame({
+    t: 12.0,
+    x: 500,
+    y: 500,
+    score: 300,
+    stance: 'DEFEND',
+    normWallDist: 0.95
+  });
+  agent.onDeath(false); // Triggers autopsy and saves checkpoint
+
+  const serialized = storage.getItem(harness.STORAGE_KEY);
+  assert.ok(serialized, 'checkpoint must be saved to storage');
+  const parsed = JSON.parse(serialized);
+
+  assert.ok(parsed.telemetry, 'checkpoint must contain telemetry object');
+  assert.equal(parsed.telemetry.lastDeathAutopsy.cause, 'ARENA_WALL');
+  assert.equal(parsed.telemetry.recentEpisodeHistory.length, 1);
+
+  // Restore state into fresh agent
+  const agent2 = harness.newAgent();
+  agent2.applySavedState(parsed);
+  assert.equal(agent2.flightRecorder.lastDeathAutopsy.cause, 'ARENA_WALL');
+  assert.equal(agent2.flightRecorder.recentEpisodes.length, 1);
+
+  const report = agent2.getAutopsyReport();
+  assert.equal(report.cause, 'ARENA_WALL');
+});
+
+test('SlitherMLAgent evaluate updates flightRecorder and onDeath generates autopsy', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+  const snake = { id: 'me', xx: 100, yy: 100, eang: 0, sc: 1.0, sp: 5.9, sct: 15, pts: [] };
+
+  // Run 5 evaluation frames
+  for (let i = 0; i < 5; i++) {
+    agent.evaluate(snake, [], [], []);
+  }
+
+  assert.equal(agent.flightRecorder.totalFrames, 5);
+  assert.equal(agent.flightRecorder.stanceCounts.FORAGE, 5);
+
+  agent.onDeath(false);
+  assert.ok(agent.flightRecorder.lastDeathAutopsy);
+  assert.equal(agent.flightRecorder.recentEpisodes.length, 1);
+});

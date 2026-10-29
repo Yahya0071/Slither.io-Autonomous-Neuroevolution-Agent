@@ -1,12 +1,13 @@
 {
   "name": "slither-ml-agent",
-  "version": "5.9.0",
-  "description": "Autonomous Neuroevolution Machine Learning Agent for official Slither.io",
+  "version": "5.10.0",
+  "description": "Autonomous Neuroevolution Machine Learning Agent with Forensic Deductor & Pathfinder for official Slither.io",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test",
+    "analyze": "node sim/analyze_checkpoint.mjs",
     "start": "start quick_start.html"
   },
   "engines": {

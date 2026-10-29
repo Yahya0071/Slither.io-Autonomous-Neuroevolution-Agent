@@ -1,6 +1,6 @@
 /**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.9.0 (Grandmaster Combat & Failure-Trauma Filter Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -16,7 +16,8 @@
  *  - [T] or [B] : Toggle Autopilot / Teacher Mode
  *  - [V]        : Toggle Vision Rays Overlay ON / OFF
  *  - [R]        : Toggle Auto-Respawn ON / OFF
- *  - [A]        : Load Apex Champion Preset (Gen 72)
+ *  - [O]        : View Last Death Autopsy Report
+ *  - [A]        : Load Apex Champion Preset (Gen 100)
  *  - [X]        : Reset Brain to Generation 1
  *  - [E]        : Export Brain Checkpoint
  *  - [I]        : Import Brain Checkpoint
@@ -25,7 +26,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.9.0 (Grandmaster Combat & Failure-Trauma Filter Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -273,10 +274,311 @@
   }
 
   // ==========================================
+  // 1.5 FLIGHT RECORDER & FORENSIC DEDUCTOR
+  // ==========================================
+  class FlightRecorder {
+    constructor(options = {}) {
+      this.bufferCapacity = options.bufferCapacity || 60; // 60 frames (~1.0s at 60 FPS)
+      this.frameBuffer = [];
+      this.bufferIndex = 0;
+
+      // Compact Pathfinder Breadcrumbs
+      this.maxWaypoints = 60;
+      this.waypointIntervalSec = 2.5;
+      this.lastWaypointTime = -999;
+      this.waypoints = []; // [[x, y, Math.round(t), Math.round(score), stance], ...]
+      this.lastLifeWaypoints = [];
+
+      // Growth Milestones
+      this.milestoneTargets = [500, 1000, 2500, 5000, 10000, 15000, 20000];
+      this.growthMilestones = {}; // { "500": 14.2, "1000": 32.5, ... }
+
+      // Spatial Zone Distribution (frame counters)
+      this.zoneCounts = { center: 0, midfield: 0, perimeter: 0 };
+      this.totalFrames = 0;
+
+      // Stance Frame Counters
+      this.stanceCounts = {
+        WANDER: 0,
+        FORAGE: 0,
+        ATTACK: 0,
+        COIL: 0,
+        CONSTRICT: 0,
+        DEFEND: 0,
+        VACUUM: 0
+      };
+
+      // Significant Incidents Log (max 25 per life)
+      this.maxIncidents = 25;
+      this.incidents = [];
+
+      // Autopsy & Episode History
+      this.lastDeathAutopsy = null;
+      this.recentEpisodes = []; // max 10
+      this.maxRecentEpisodes = 10;
+    }
+
+    resetLife() {
+      if (this.waypoints.length > 0) {
+        this.lastLifeWaypoints = this.waypoints.slice(-40);
+      }
+      this.frameBuffer = [];
+      this.bufferIndex = 0;
+      this.waypoints = [];
+      this.lastWaypointTime = -999;
+      this.growthMilestones = {};
+      this.zoneCounts = { center: 0, midfield: 0, perimeter: 0 };
+      this.totalFrames = 0;
+      for (const k of Object.keys(this.stanceCounts)) {
+        this.stanceCounts[k] = 0;
+      }
+      this.incidents = [];
+    }
+
+    recordFrame(snapshot) {
+      if (!snapshot) return;
+      this.totalFrames++;
+
+      // 1. Rolling FIFO Frame Buffer
+      if (this.frameBuffer.length < this.bufferCapacity) {
+        this.frameBuffer.push(snapshot);
+      } else {
+        this.frameBuffer[this.bufferIndex] = snapshot;
+        this.bufferIndex = (this.bufferIndex + 1) % this.bufferCapacity;
+      }
+
+      // 2. Stance Counter
+      const st = snapshot.stance || 'FORAGE';
+      if (typeof this.stanceCounts[st] === 'number') {
+        this.stanceCounts[st]++;
+      } else {
+        this.stanceCounts[st] = 1;
+      }
+
+      // 3. Spatial Zone Tracking (Arena radius grd is ~21,600)
+      const distFromOrigin = Math.hypot(snapshot.x || 0, snapshot.y || 0);
+      const normDist = Number.isFinite(snapshot.normWallDist) ? snapshot.normWallDist : (distFromOrigin / 21600);
+      if (normDist < 0.45) {
+        this.zoneCounts.center++;
+      } else if (normDist < 0.82) {
+        this.zoneCounts.midfield++;
+      } else {
+        this.zoneCounts.perimeter++;
+      }
+
+      // 4. Growth Milestones
+      const currentScore = snapshot.score || 0;
+      for (let i = 0; i < this.milestoneTargets.length; i++) {
+        const target = this.milestoneTargets[i];
+        if (currentScore >= target && typeof this.growthMilestones[target] !== 'number') {
+          this.growthMilestones[target] = Math.round((snapshot.t || 0) * 10) / 10;
+        }
+      }
+
+      // 5. Pathfinder Breadcrumbs (compact downsampled waypoints)
+      const t = snapshot.t || 0;
+      if (t - this.lastWaypointTime >= this.waypointIntervalSec) {
+        this.lastWaypointTime = t;
+        if (this.waypoints.length >= this.maxWaypoints) {
+          this.waypoints.shift();
+        }
+        this.waypoints.push([
+          Math.round(snapshot.x || 0),
+          Math.round(snapshot.y || 0),
+          Math.round(t),
+          Math.round(currentScore),
+          snapshot.stance || 'FORAGE'
+        ]);
+      }
+    }
+
+    logIncident(type, details = {}) {
+      if (this.incidents.length >= this.maxIncidents) return;
+      this.incidents.push({
+        t: Math.round((details.t || 0) * 10) / 10,
+        type,
+        x: Math.round(details.x || 0),
+        y: Math.round(details.y || 0),
+        info: details.info || ''
+      });
+    }
+
+    deduceDeathAutopsy(meta = {}) {
+      const orderedFrames = this._getOrderedFrames();
+      const last = orderedFrames[orderedFrames.length - 1] || null;
+      const prev = orderedFrames.length > 5 ? orderedFrames[orderedFrames.length - 5] : last;
+
+      let cause = 'SUDDEN_IMPACT';
+      let description = 'Sudden collision or server despawn';
+      let confidence = 0.5;
+
+      if (last) {
+        const headRadius = 14 * ((last.score ? Math.sqrt(last.score / 15) : 1) || 1);
+        const distFromOrigin = Math.hypot(last.x || 0, last.y || 0);
+        const nearWall = (last.normWallDist >= 0.94) || (distFromOrigin >= 21600 - 350);
+
+        if (nearWall) {
+          cause = 'ARENA_WALL';
+          description = 'Collision with outer perimeter boundary wall';
+          confidence = 0.95;
+        } else if (last.stance === 'COIL' || (prev && prev.stance === 'COIL')) {
+          cause = 'ENCIRCLED_TRAP';
+          description = 'Suffocated inside closed predator coil without open exit slit';
+          confidence = 0.88;
+        } else if (last.threatType === 'head' && last.threatDist <= headRadius * 2.8) {
+          const isFacingUs = Math.abs(last.threatAngle || 0) <= Math.PI * 0.45;
+          if (isFacingUs && (last.threatMassRatio || 1.0) > 1.1) {
+            cause = 'HEAD_ON_RAM';
+            description = 'Frontal collision with larger predator head';
+            confidence = 0.92;
+          } else {
+            cause = 'HEAD_ON_JOUST';
+            description = 'Simultaneous head-to-head collision';
+            confidence = 0.85;
+          }
+        } else if (last.threatType === 'body' && last.threatDist <= headRadius * 3.2) {
+          if (last.stance === 'ATTACK' || (prev && prev.stance === 'ATTACK')) {
+            cause = 'ATTACK_OVEREXTENDED';
+            description = 'Counter-intercepted while executing offensive strike';
+            confidence = 0.86;
+          } else if ((last.threatSpeed || 5.9) > 8.0) {
+            cause = 'FLANK_CUTOFF';
+            description = 'Cut off by high-speed enemy boost trajectory';
+            confidence = 0.90;
+          } else {
+            cause = 'BODY_COLLISION';
+            description = 'Impacted enemy body segments';
+            confidence = 0.80;
+          }
+        } else if (last.isBoosting && meta.finalScore < 15 && meta.survivalTime > 10) {
+          cause = 'BOOST_STARVATION';
+          description = 'Starved mass down to zero fuel threshold during sprint';
+          confidence = 0.82;
+        } else if (last.threatDist <= headRadius * 4.0) {
+          cause = 'BODY_COLLISION';
+          description = 'Unavoidable collision with dense body segments';
+          confidence = 0.75;
+        }
+      }
+
+      const autopsy = {
+        cause,
+        description,
+        confidence,
+        fatalStance: last ? last.stance : 'UNKNOWN',
+        survivalTime: Math.round((meta.survivalTime || 0) * 10) / 10,
+        finalScore: Math.round(meta.finalScore || 0),
+        peakLength: Math.round(meta.peakLength || 0),
+        isHumanDriven: Boolean(meta.isHumanDriven),
+        generation: meta.generation || 1,
+        episode: meta.episode || 1,
+        timestamp: Date.now(),
+        killerProfile: last ? {
+          type: last.threatType || 'unknown',
+          dist: Math.round((last.threatDist || 0) * 10) / 10,
+          massRatio: Math.round((last.threatMassRatio || 1.0) * 100) / 100,
+          speed: Math.round((last.threatSpeed || 5.9) * 10) / 10
+        } : null,
+        preCrashTelemetry: last ? {
+          x: Math.round(last.x || 0),
+          y: Math.round(last.y || 0),
+          speed: Math.round((last.sp || 5.9) * 10) / 10,
+          turnDelta: Math.round((last.turnDelta || 0) * 1000) / 1000,
+          isBoosting: Boolean(last.isBoosting),
+          dominantRayIdx: last.dominantRayIdx ?? -1,
+          dominantRayDist: Math.round((last.dominantRayDist || 1.0) * 100) / 100
+        } : null,
+        incidentsCount: this.incidents.length
+      };
+
+      this.lastDeathAutopsy = autopsy;
+      this.lastLifeWaypoints = this.waypoints.slice(-40);
+
+      this.recentEpisodes.push({
+        gen: autopsy.generation,
+        ep: autopsy.episode,
+        durationS: autopsy.survivalTime,
+        peakLength: autopsy.peakLength,
+        finalScore: autopsy.finalScore,
+        deathCause: autopsy.cause,
+        fatalStance: autopsy.fatalStance
+      });
+      if (this.recentEpisodes.length > this.maxRecentEpisodes) {
+        this.recentEpisodes.shift();
+      }
+
+      return autopsy;
+    }
+
+    _getOrderedFrames() {
+      if (this.frameBuffer.length < this.bufferCapacity) {
+        return [...this.frameBuffer];
+      }
+      return [
+        ...this.frameBuffer.slice(this.bufferIndex),
+        ...this.frameBuffer.slice(0, this.bufferIndex)
+      ];
+    }
+
+    _calculateStanceDutyCycles() {
+      const total = Object.values(this.stanceCounts).reduce((a, b) => a + b, 0);
+      if (total === 0) return {};
+      const result = {};
+      for (const [stance, count] of Object.entries(this.stanceCounts)) {
+        if (count > 0) {
+          result[stance] = `${((count / total) * 100).toFixed(1)}%`;
+        }
+      }
+      return result;
+    }
+
+    _calculateZoneDistribution() {
+      const total = this.zoneCounts.center + this.zoneCounts.midfield + this.zoneCounts.perimeter;
+      if (total === 0) return { center: '0%', midfield: '0%', perimeter: '0%' };
+      return {
+        center: `${((this.zoneCounts.center / total) * 100).toFixed(1)}%`,
+        midfield: `${((this.zoneCounts.midfield / total) * 100).toFixed(1)}%`,
+        perimeter: `${((this.zoneCounts.perimeter / total) * 100).toFixed(1)}%`
+      };
+    }
+
+    getTelemetrySummary() {
+      return {
+        version: '1.0.0',
+        lastDeathAutopsy: this.lastDeathAutopsy,
+        recentEpisodeHistory: [...this.recentEpisodes],
+        growthMilestones: { ...this.growthMilestones },
+        stanceDutyCycles: this._calculateStanceDutyCycles(),
+        zoneDistribution: this._calculateZoneDistribution(),
+        pathfinderBreadcrumbs: this.lastLifeWaypoints.length > 0
+          ? [...this.lastLifeWaypoints]
+          : this.waypoints.slice(-40)
+      };
+    }
+
+    loadTelemetry(telemetry) {
+      if (!telemetry || typeof telemetry !== 'object') return;
+      if (telemetry.lastDeathAutopsy) {
+        this.lastDeathAutopsy = telemetry.lastDeathAutopsy;
+      }
+      if (Array.isArray(telemetry.recentEpisodeHistory)) {
+        this.recentEpisodes = telemetry.recentEpisodeHistory.slice(-this.maxRecentEpisodes);
+      }
+      if (telemetry.growthMilestones && typeof telemetry.growthMilestones === 'object') {
+        this.growthMilestones = { ...telemetry.growthMilestones };
+      }
+      if (Array.isArray(telemetry.pathfinderBreadcrumbs)) {
+        this.lastLifeWaypoints = telemetry.pathfinderBreadcrumbs.slice(-40);
+      }
+    }
+  }
+
+  // ==========================================
   // 2. HYBRID AGENT (EVOLUTION + IMITATION)
   // ==========================================
   class SlitherMLAgent {
     constructor() {
+      this.flightRecorder = new FlightRecorder();
       this.rayCount = 16;
       this.baseSensorRange = 520;
       this.foodSectorCount = 8;
@@ -397,6 +699,9 @@
       this.allTimePeakLength = typeof parsed.allTimePeakLength === 'number' ? parsed.allTimePeakLength : (this.allTimePeakLength || 0);
       this.stagnantGens = typeof parsed.stagnantGens === 'number' ? parsed.stagnantGens : 0;
       this.lastLoadedTimestamp = parsed.timestamp || Date.now();
+      if (parsed.telemetry) {
+        this.flightRecorder.loadTelemetry(parsed.telemetry);
+      }
       return true;
     }
 
@@ -597,6 +902,7 @@
       this.constrictTarget = null;
       this.lastKillEpicenter = null;
       this.vacuumActiveUntil = 0;
+      this.flightRecorder = new FlightRecorder();
       this._seedBaselineWeights();
       console.log('%c[SlitherML] 🔄 Brain reset to Gen 1 Baseline Weights.', 'color: #ffb703; font-weight: bold;');
     }
@@ -924,6 +1230,12 @@
             this.fitness += 250.0;
             this.lastKillEpicenter = { x: record.xx, y: record.yy, timestamp: now };
             this.vacuumActiveUntil = now + 4000;
+            this.flightRecorder.logIncident('KILL_CONFIRMED', {
+              t: this.survivalTime,
+              x: record.xx,
+              y: record.yy,
+              info: `Kill #${this.kills} (+250 Bounty)`
+            });
             console.log(`%c[SlitherML] 🎯 ENEMY ELIMINATED! Confirmed Kill #${this.kills} (+250 Fitness Bounty). Activating 4s Post-Kill Corpse Vacuum Mode!`, 'color: #ff0055; font-weight: bold;');
           }
           this.enemyTracker.delete(id);
@@ -1545,6 +1857,12 @@
           if (encirclementEscape && encirclementEscape.isOpen) {
             // Anti-Encirclement Slit Breaching (v5.9.0):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
+            this.flightRecorder.logIncident('SLIT_BREACH_ESCAPE', {
+              t: this.survivalTime,
+              x: snake.xx,
+              y: snake.yy,
+              info: `Slit angle: ${encirclementEscape.slitAngle.toFixed(2)}`
+            });
             let slitError = encirclementEscape.slitAngle - currentAng;
             while (slitError > Math.PI) slitError -= Math.PI * 2;
             while (slitError < -Math.PI) slitError += Math.PI * 2;
@@ -1557,6 +1875,12 @@
             // If enemy is cutting from one flank and our impenetrable body shield is on the opposite flank,
             // tuck head safely against our own body shield!
             if (selfShieldSide !== 0 && selfShieldSide === -cutOffThreat.cutSide) {
+              this.flightRecorder.logIncident('POCKET_SHIELD_DEFENSE', {
+                t: this.survivalTime,
+                x: snake.xx,
+                y: snake.yy,
+                info: `Shield side: ${selfShieldSide}`
+              });
               turnDelta = selfShieldSide * 1.0;
             } else {
               // Standard bank sharply AWAY from incoming cut trajectory:
@@ -1752,6 +2076,37 @@
         this.boostDuration = 0;
       }
 
+      let dominantRayIdx = 8;
+      let dominantRayDist = inputs[8];
+      for (let r = 0; r < 16; r++) {
+        if (inputs[r] > dominantRayDist) {
+          dominantRayDist = inputs[r];
+          dominantRayIdx = r;
+        }
+      }
+
+      this.flightRecorder.recordFrame({
+        t: this.survivalTime,
+        x: snake.xx ?? 0,
+        y: snake.yy ?? 0,
+        ang: currentAng,
+        sp: currentSpeed,
+        score: currentScore,
+        len: (typeof snake.sct === 'number' && snake.sct > 0) ? snake.sct : Math.floor(currentScore / 10),
+        stance: this.combatStance || 'FORAGE',
+        normWallDist,
+        threatDist: dangerSource,
+        threatType: frontObstacleType !== 'none' ? frontObstacleType : closestObstacleType,
+        threatAngle: 0,
+        threatMassRatio: this.massRatio || 1.0,
+        threatSpeed,
+        turnDelta,
+        isBoosting: this.isBoosting,
+        selfShieldSide,
+        dominantRayIdx,
+        dominantRayDist
+      });
+
       return {
         targetAngle: this.targetAngle,
         isBoosting: this.isBoosting,
@@ -1840,6 +2195,16 @@
       const runFitness = Math.max(0, this.fitness);
       const wasHumanAssisted = isHumanDriven || this.touchedByHuman;
 
+      const autopsy = this.flightRecorder.deduceDeathAutopsy({
+        finalScore: this.previousScore || 0,
+        peakLength: this.peakLength || 0,
+        survivalTime: this.survivalTime || 0,
+        isHumanDriven: wasHumanAssisted,
+        generation: this.generation,
+        episode: this.currentEpisode
+      });
+      console.log(`%c[SlitherML 💀 Autopsy] Life Ended: ${autopsy.cause} (${autopsy.description}) | Stance: ${autopsy.fatalStance} | Time: ${autopsy.survivalTime}s | Length: ${autopsy.peakLength}`, 'color: #f43f5e; font-weight: bold;');
+
       if (this.abandonCurrentEpisode) {
         console.log('%c[SlitherML] ⏭️ Life excluded (mixed-mode play detected: was partly human-driven). Neither rollout nor candidate recorded.', 'color: #94a3b8;');
       } else if (wasHumanAssisted) {
@@ -1848,6 +2213,7 @@
         this._recordEvaluationEpisode(runFitness);
       }
 
+      this.flightRecorder.resetLife();
       this.fitness = 0;
       this.survivalTime = 0;
       this.previousScore = 0;
@@ -2093,6 +2459,7 @@
           teacherSamples: this.teacherSamples,
           allTimePeakLength: this.allTimePeakLength,
           stagnantGens: this.stagnantGens,
+          telemetry: this.flightRecorder.getTelemetrySummary(),
           timestamp: Date.now()
         };
         const serialized = JSON.stringify(data);
@@ -2108,6 +2475,53 @@
       } catch (e) {
         console.warn('[SlitherML] Could not persist checkpoint:', e && e.message ? e.message : e);
       }
+    }
+
+    getAutopsyReport() {
+      const a = this.flightRecorder.lastDeathAutopsy;
+      if (!a) {
+        console.log('%c[SlitherML 💀 Autopsy] No death autopsy on record (snake has not died yet in this session).', 'color: #94a3b8;');
+        return null;
+      }
+      const lines = [
+        '======================================================',
+        '💀 SLITHER ML FLIGHT RECORDER: LAST DEATH AUTOPSY',
+        '======================================================',
+        `Cause:        ${a.cause} (Confidence: ${Math.round(a.confidence * 100)}%)`,
+        `Description:  ${a.description}`,
+        `Fatal Stance: ${a.fatalStance}`,
+        `Episode Info: Gen ${a.generation} | Episode ${a.episode} | ${a.isHumanDriven ? 'Teacher Mode' : 'Autonomous'}`,
+        `Survival:     ${a.survivalTime}s | Final Score: ${a.finalScore} | Peak Length: ${a.peakLength}`,
+        a.killerProfile ? `Killer:       Type: ${a.killerProfile.type} | Dist: ${a.killerProfile.dist} | Mass Ratio: ${a.killerProfile.massRatio}x | Speed: ${a.killerProfile.speed}` : 'Killer:       Unknown / Off-screen',
+        a.preCrashTelemetry ? `Pre-Crash:    Pos: (${a.preCrashTelemetry.x}, ${a.preCrashTelemetry.y}) | Speed: ${a.preCrashTelemetry.speed} | Boost: ${a.preCrashTelemetry.isBoosting} | TurnDelta: ${a.preCrashTelemetry.turnDelta}` : '',
+        '======================================================'
+      ].filter(Boolean);
+      const text = lines.join('\n');
+      console.log(`%c${text}`, 'color: #38bdf8; font-family: monospace; font-size: 11px;');
+      return a;
+    }
+
+    exportCheckpoint() {
+      const data = {
+        brain: (this.championBrain || this.brain).export(),
+        activeBrain: this.brain.export(),
+        hasChampion: Boolean(this.championBrain),
+        bestFitness: this.bestFitness,
+        allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
+        generation: this.generation,
+        currentEpisode: this.currentEpisode,
+        episodeFitnesses: this.episodeFitnesses,
+        candidatePending: this.candidatePending,
+        candidateSource: this.candidateSource,
+        kills: this.kills,
+        teacherSamples: this.teacherSamples,
+        allTimePeakLength: this.allTimePeakLength,
+        stagnantGens: this.stagnantGens,
+        telemetry: this.flightRecorder.getTelemetrySummary(),
+        timestamp: Date.now()
+      };
+      return JSON.stringify(data, null, 2);
+    }
     }
   }
 
@@ -2164,6 +2578,7 @@
           <div style="display:flex;justify-content:space-between;"><span>Champion:</span><span id="smlBestFitness" style="font-weight:700;color:#00f5d4;">${Math.floor(this.agent.bestFitness)}</span></div>
           <div style="display:flex;justify-content:space-between;"><span>Peak Score:</span><span id="smlPeakLength" style="font-weight:700;color:#fff;">${Math.floor(this.agent.allTimePeakLength || this.agent.peakLength || 0)}</span></div>
           <div style="display:flex;justify-content:space-between;"><span>Survival:</span><span id="smlTime" style="font-weight:700;color:#fff;">0s</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>Last Autopsy:</span><span id="smlAutopsy" style="font-weight:700;color:#94a3b8;font-size:10px;">NONE</span></div>
         </div>
         <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.06);">
           <button id="smlBtnToggle" style="padding:6px;border-radius:6px;background:rgba(0,245,212,0.2);border:1px solid #00f5d4;color:#00f5d4;font-weight:700;font-size:11px;cursor:pointer;">Autopilot: ON [T]</button>
@@ -2174,6 +2589,7 @@
             <button id="smlBtnImport" style="flex:1;padding:6px;border-radius:6px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#c084fc;font-size:11px;cursor:pointer;font-weight:600;">Import [I]</button>
             <button id="smlBtnApex" style="flex:1;padding:6px;border-radius:6px;background:rgba(255,183,3,0.15);border:1px solid rgba(255,183,3,0.3);color:#ffb703;font-size:11px;cursor:pointer;font-weight:600;" title="Load Gen 100 Apex Champion (168 Kills, 1.08M Lessons)">Apex [A]</button>
           </div>
+          <button id="smlBtnAutopsy" style="padding:6px;border-radius:6px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:11px;cursor:pointer;font-weight:600;">View Autopsy [O]</button>
           <button id="smlBtnReset" style="padding:6px;border-radius:6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#f87171;font-size:11px;cursor:pointer;font-weight:600;">Reset Brain [X]</button>
           <input type="file" id="smlFileInput" accept=".json" style="display:none;" />
         </div>
@@ -2206,6 +2622,7 @@
         elKills: document.getElementById('smlKills'),
         elStance: document.getElementById('smlStance'),
         elRadar: document.getElementById('smlRadar'),
+        elAutopsy: document.getElementById('smlAutopsy'),
         smlGenBadge: document.getElementById('smlGenBadge'),
         smlStatus: document.getElementById('smlStatus'),
         smlStatusDot: document.getElementById('smlStatusDot'),
@@ -2218,6 +2635,8 @@
       if (btnVisuals) btnVisuals.onclick = () => this.toggleVisuals();
       const btnRespawn = document.getElementById('smlBtnRespawn');
       if (btnRespawn) btnRespawn.onclick = () => this.toggleAutoRespawn();
+      const btnAutopsy = document.getElementById('smlBtnAutopsy');
+      if (btnAutopsy) btnAutopsy.onclick = () => this.agent.getAutopsyReport();
       const btnReset = document.getElementById('smlBtnReset');
       if (btnReset) btnReset.onclick = () => this.resetBrain();
       const btnExport = document.getElementById('smlBtnExport');
@@ -2323,6 +2742,8 @@
           this.exportBrain();
         } else if (e.code === 'KeyI') {
           this.importBrain();
+        } else if (e.code === 'KeyO') {
+          this.agent.getAutopsyReport();
         } else if (e.code === 'KeyA') {
           this.loadApexPreset();
         }
@@ -2677,6 +3098,15 @@
         this.isAlive = false;
         const isHumanDriven = !this.enabled;
         this.agent.onDeath(isHumanDriven);
+
+        const dom = this._domRefs || {};
+        const autopsy = this.agent.flightRecorder.lastDeathAutopsy;
+        const elAutopsy = dom.elAutopsy || document.getElementById('smlAutopsy');
+        if (elAutopsy && autopsy) {
+          elAutopsy.textContent = autopsy.cause;
+          elAutopsy.style.color = '#f43f5e';
+          elAutopsy.title = autopsy.description;
+        }
 
         const badge = document.getElementById('smlGenBadge');
         if (badge) {
@@ -3062,5 +3492,12 @@
     } catch (_) { }
   }
   pageWindow._slitherMLController = new SlitherMLController();
-  console.log('%c[SlitherML] 🚀 Hybrid Machine Learning Agent v5.4.0 is RUNNING and ACTIVE in console!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  pageWindow.__slitherML = {
+    controller: pageWindow._slitherMLController,
+    agent: pageWindow._slitherMLController.agent,
+    getAutopsy: () => pageWindow._slitherMLController.agent.getAutopsyReport(),
+    getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
+    exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
+  };
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();
