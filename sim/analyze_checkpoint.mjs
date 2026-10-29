@@ -92,7 +92,7 @@ if (targetNet.weights && targetNet.weights[0]) {
   for (let i = 0; i < numInputs; i++) {
     let sum = 0;
     for (let h = 0; h < numH1; h++) {
-      sum += Math.abs(w0[h * numInputs + i] || 0);
+      sum += Math.abs(w0[i * numH1 + h] || 0);
     }
     saliencies.push({ idx: i, name: inputNames[i] || `Input [${i}]`, salience: sum });
   }

@@ -1,6 +1,6 @@
 /**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -26,7 +26,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -316,7 +316,8 @@
         COIL: 0,
         CONSTRICT: 0,
         DEFEND: 0,
-        VACUUM: 0
+        VACUUM: 0,
+        TEACHER: 0
       };
 
       // Significant Incidents Log (max 25 per life)
@@ -424,7 +425,10 @@
       let confidence = 0.5;
 
       if (last) {
-        const headRadius = 14 * ((last.score ? Math.sqrt(last.score / 15) : 1) || 1);
+        const estScale = last.score ? Math.min(3.5, 1 + last.score / 15000) : 1;
+        const headRadius = (typeof last.headRadius === 'number' && last.headRadius > 0)
+          ? last.headRadius
+          : (14 * estScale);
         const distFromOrigin = Math.hypot(last.x || 0, last.y || 0);
         const nearWall = (last.normWallDist >= 0.94) || (distFromOrigin >= 21600 - 350);
 
@@ -556,6 +560,7 @@
     getTelemetrySummary() {
       return {
         version: '1.0.0',
+        totalRecordedFrames: this.totalFrames,
         lastDeathAutopsy: this.lastDeathAutopsy,
         recentEpisodeHistory: [...this.recentEpisodes],
         growthMilestones: { ...this.growthMilestones },
@@ -569,6 +574,9 @@
 
     loadTelemetry(telemetry) {
       if (!telemetry || typeof telemetry !== 'object') return;
+      if (typeof telemetry.totalRecordedFrames === 'number') {
+        this.totalFrames = telemetry.totalRecordedFrames;
+      }
       if (telemetry.lastDeathAutopsy) {
         this.lastDeathAutopsy = telemetry.lastDeathAutopsy;
       }
@@ -1300,6 +1308,8 @@
       let frontThreatSpeed = 5.9;
       let closestObstacleType = 'none';
       let frontObstacleType = 'none';
+      let closestObstacleAngle = 0;
+      let frontObstacleAngle = 0;
       let forwardObstacleDanger = false;
       let leftClearance = 0;
       let rightClearance = 0;
@@ -1445,6 +1455,7 @@
         if (closestDist < minObstacleDist) {
           minObstacleDist = closestDist;
           closestObstacleType = hitType;
+          closestObstacleAngle = relAngle;
         }
 
         // +/-45 degrees around the heading
@@ -1453,6 +1464,7 @@
           frontThreatScale = hitScale;
           frontObstacleType = hitType;
           frontThreatSpeed = hitSpeed;
+          frontObstacleAngle = relAngle;
         }
 
         // Anti-Encirclement Threat Tracking (v5.9.0):
@@ -1688,6 +1700,8 @@
         constrictCandidate,
         closestObstacleType,
         frontObstacleType,
+        closestObstacleAngle,
+        frontObstacleAngle,
         selfShieldSide,
         frontThreatSpeed,
         nearestThreatSpeed,
@@ -1772,6 +1786,8 @@
         constrictCandidate,
         closestObstacleType = 'none',
         frontObstacleType = 'none',
+        closestObstacleAngle = 0,
+        frontObstacleAngle = 0,
         selfShieldSide = 0,
         frontThreatSpeed = 5.9,
         nearestThreatSpeed = 5.9,
@@ -2117,6 +2133,7 @@
         }
       }
 
+      const activeThreatAngle = frontObstacleType !== 'none' ? frontObstacleAngle : closestObstacleAngle;
       this.flightRecorder.recordFrame({
         t: this.survivalTime,
         x: snake.xx ?? 0,
@@ -2124,12 +2141,13 @@
         ang: currentAng,
         sp: currentSpeed,
         score: currentScore,
+        headRadius,
         len: (typeof snake.sct === 'number' && snake.sct > 0) ? snake.sct : Math.floor(currentScore / 10),
         stance: this.combatStance || 'FORAGE',
         normWallDist,
         threatDist: dangerSource,
         threatType: frontObstacleType !== 'none' ? frontObstacleType : closestObstacleType,
-        threatAngle: 0,
+        threatAngle: activeThreatAngle,
         threatMassRatio: this.massRatio || 1.0,
         threatSpeed,
         turnDelta,
@@ -2221,6 +2239,43 @@
       this.prevTurnEma = this.prevTurnEma * 0.85 + humanSteerTarget * 0.15;
       this.targetAngle = humanAimAngle;
       this.isBoosting = isHumanBoosting;
+
+      let dominantRayIdx = 0;
+      let dominantRayDist = 0;
+      for (let r = 0; r < this.rayCount; r++) {
+        if (inputs[r] > dominantRayDist) {
+          dominantRayDist = inputs[r];
+          dominantRayIdx = r;
+        }
+      }
+
+      const currentScore = (typeof snake.sct === 'number' && snake.sct > 0)
+        ? snake.sct
+        : (state.currentScore || (snake.sc ? Math.floor(15 * (snake.sc - 1) / 0.001) : 0));
+      const currentSpeed = (typeof snake.sp === 'number' && snake.sp > 0) ? snake.sp : (isHumanBoosting ? 14 : 5.9);
+
+      this.flightRecorder.recordFrame({
+        t: this.survivalTime,
+        x: snake.xx ?? 0,
+        y: snake.yy ?? 0,
+        ang: currentAng,
+        sp: currentSpeed,
+        score: currentScore,
+        headRadius: state.headRadius,
+        len: (typeof snake.sct === 'number' && snake.sct > 0) ? snake.sct : Math.floor(currentScore / 10),
+        stance: 'TEACHER',
+        normWallDist: state.normWallDist,
+        threatDist: Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist,
+        threatType: state.frontObstacleType !== 'none' ? state.frontObstacleType : state.closestObstacleType,
+        threatAngle: state.frontObstacleType !== 'none' ? state.frontObstacleAngle : state.closestObstacleAngle,
+        threatMassRatio: (state.frontThreatScale || 1) / Math.max(0.01, snake.sc || 1),
+        threatSpeed: state.frontThreatSpeed || 5.9,
+        turnDelta: humanSteerTarget,
+        isBoosting: isHumanBoosting,
+        selfShieldSide: state.selfShieldSide || 0,
+        dominantRayIdx,
+        dominantRayDist
+      });
     }
 
     onDeath(isHumanDriven = false) {
@@ -2861,28 +2916,8 @@
 
     exportBrain() {
       try {
-        const championExport = this.agent.championBrain
-          ? this.agent.championBrain.export()
-          : this.agent.brain.export();
-        const activeExport = this.agent.brain.export();
-        const data = {
-          brain: championExport,
-          activeBrain: activeExport,
-          hasChampion: Boolean(this.agent.championBrain),
-          bestFitness: this.agent.bestFitness,
-          allTimePeakFitness: this.agent.allTimePeakFitness || this.agent.bestFitness,
-          generation: this.agent.generation,
-          currentEpisode: this.agent.currentEpisode,
-          episodeFitnesses: this.agent.episodeFitnesses,
-          candidatePending: this.agent.candidatePending,
-          candidateSource: this.agent.candidateSource,
-          kills: this.agent.kills,
-          teacherSamples: this.agent.teacherSamples,
-          allTimePeakLength: this.agent.allTimePeakLength,
-          stagnantGens: this.agent.stagnantGens,
-          timestamp: Date.now()
-        };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const serialized = this.agent.exportCheckpoint();
+        const blob = new Blob([serialized], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -2893,7 +2928,7 @@
           a.remove();
           URL.revokeObjectURL(url);
         }, 100);
-        console.log(`%c[SlitherML] 💾 Exported Gen ${this.agent.generation} brain to slither_ml_brain_gen${this.agent.generation}.json`, 'color: #00f5d4; font-weight: bold;');
+        console.log(`%c[SlitherML] 💾 Exported Gen ${this.agent.generation} brain + flight telemetry to slither_ml_brain_gen${this.agent.generation}.json`, 'color: #00f5d4; font-weight: bold;');
       } catch (err) {
         console.warn('[SlitherML] Could not export brain:', err && err.message ? err.message : err);
       }
@@ -3559,5 +3594,5 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.0 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();

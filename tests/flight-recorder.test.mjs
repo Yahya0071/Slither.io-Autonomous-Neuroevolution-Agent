@@ -11,7 +11,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadAgent, MemoryStorage } from '../agent-loader.mjs';
+import { loadAgent, MemoryStorage, sourceCode, extractClass } from '../agent-loader.mjs';
 
 test('FlightRecorder initializes cleanly with expected default state', () => {
   const harness = loadAgent();
@@ -285,5 +285,83 @@ test('SlitherMLAgent evaluate updates flightRecorder and onDeath generates autop
   agent.onDeath(false);
   assert.ok(agent.flightRecorder.lastDeathAutopsy);
   assert.equal(agent.flightRecorder.recentEpisodes.length, 1);
+});
+
+test('high-score headRadius accuracy: distant threats at high scores are not misclassified as point-blank collisions', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  // High score 15,000 snake with enemy head at 300px distance (far outside point-blank radius)
+  rec.recordFrame({
+    t: 120.0,
+    x: 0,
+    y: 0,
+    sp: 5.9,
+    score: 15000,
+    headRadius: 28, // realistic scale: 14 * 2.0
+    stance: 'FORAGE',
+    normWallDist: 0.2,
+    threatDist: 300,
+    threatType: 'head',
+    threatAngle: 0.1,
+    threatMassRatio: 1.5,
+    threatSpeed: 5.9
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 120.0,
+    finalScore: 15000,
+    peakLength: 1500,
+    generation: 15,
+    episode: 2
+  });
+
+  // Old bug calculated headRadius = 14 * sqrt(15000 / 15) = 442.7px, where 442.7 * 2.8 = 1239px > 300px,
+  // causing a distant threat to falsely trigger HEAD_ON_RAM.
+  // With realistic headRadius = 28px, 28 * 2.8 = 78.4px < 300px, correctly identifying SUDDEN_IMPACT.
+  assert.notEqual(autopsy.cause, 'HEAD_ON_RAM');
+  assert.notEqual(autopsy.cause, 'BODY_COLLISION');
+  assert.equal(autopsy.cause, 'SUDDEN_IMPACT');
+});
+
+test('Teacher Mode autopsy recording: records flight frames during learnFromHuman and deduces cause on death', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+  // Near arena perimeter wall: xx = 21500
+  const snake = { id: 'me', xx: 21500, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 10, pts: [] };
+
+  for (let i = 0; i < 5; i++) {
+    agent.learnFromHuman(snake, [], [], [], 100, 0, false);
+  }
+
+  assert.ok(agent.flightRecorder.totalFrames >= 5, 'should record flight frames during Teacher mode');
+  assert.equal(agent.flightRecorder.stanceCounts.TEACHER, 5, 'should increment TEACHER stance frames');
+
+  agent.onDeath(true);
+  const autopsy = agent.flightRecorder.lastDeathAutopsy;
+  assert.ok(autopsy, 'autopsy should exist');
+  assert.equal(autopsy.cause, 'ARENA_WALL');
+  assert.equal(autopsy.fatalStance, 'TEACHER');
+  assert.equal(autopsy.isHumanDriven, true);
+});
+
+test('Controller & Agent export parity: exportCheckpoint includes telemetry and exportBrain delegates to it', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  // 1. Agent exportCheckpoint includes telemetry
+  const serialized = agent.exportCheckpoint();
+  assert.ok(serialized, 'checkpoint must serialize');
+  const parsed = JSON.parse(serialized);
+  assert.ok(parsed.telemetry, 'exported checkpoint must contain telemetry block');
+  assert.equal(typeof parsed.telemetry.totalRecordedFrames, 'number');
+
+  // 2. Controller source code delegates exportBrain() to this.agent.exportCheckpoint()
+  const controllerSrc = extractClass(sourceCode, 'SlitherMLController');
+  assert.ok(
+    controllerSrc.includes('this.agent.exportCheckpoint()'),
+    'SlitherMLController.exportBrain must delegate directly to this.agent.exportCheckpoint()'
+  );
 });
 
