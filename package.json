@@ -1,0 +1,21 @@
+{
+  "name": "slither-ml-agent",
+  "version": "5.9.0",
+  "description": "Autonomous Neuroevolution Machine Learning Agent for official Slither.io",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test --test-isolation=none \"tests/*.test.mjs\"",
+    "start": "start quick_start.html"
+  },
+  "engines": {
+    "node": ">=22.8"
+  },
+  "keywords": [
+    "slitherio",
+    "machine-learning",
+    "neuroevolution",
+    "reinforcement-learning"
+  ]
+}
