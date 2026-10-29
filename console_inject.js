@@ -429,8 +429,9 @@
         const headRadius = (typeof last.headRadius === 'number' && last.headRadius > 0)
           ? last.headRadius
           : (14 * estScale);
-        const distFromOrigin = Math.hypot(last.x || 0, last.y || 0);
-        const nearWall = (last.normWallDist >= 0.94) || (distFromOrigin >= 21600 - 350);
+        const nearWall = (typeof last.normWallDist === 'number')
+          ? (last.normWallDist >= 0.94 || (last.threatType === 'wall' && last.threatDist <= headRadius * 4.0))
+          : (Math.hypot(last.x || 0, last.y || 0) >= 21600 - 350);
 
         if (nearWall) {
           cause = 'ARENA_WALL';
@@ -469,7 +470,7 @@
           cause = 'BOOST_STARVATION';
           description = 'Starved mass down to zero fuel threshold during sprint';
           confidence = 0.82;
-        } else if (last.threatDist <= headRadius * 4.0) {
+        } else if (last.threatDist <= headRadius * 4.0 && last.threatType !== 'self' && last.threatType !== 'none') {
           cause = 'BODY_COLLISION';
           description = 'Unavoidable collision with dense body segments';
           confidence = 0.75;
@@ -488,8 +489,8 @@
         generation: meta.generation || 1,
         episode: meta.episode || 1,
         timestamp: Date.now(),
-        killerProfile: last ? {
-          type: last.threatType || 'unknown',
+        killerProfile: (last && last.threatType && last.threatType !== 'none' && last.threatType !== 'self') ? {
+          type: last.threatType,
           dist: Math.round((last.threatDist || 0) * 10) / 10,
           massRatio: Math.round((last.threatMassRatio || 1.0) * 100) / 100,
           speed: Math.round((last.threatSpeed || 5.9) * 10) / 10
@@ -1027,7 +1028,9 @@
 
     // Shared sensor extraction pipeline for both Autonomous and Teacher modes
     _extractInputs(snake, snakes, foods, preys, dt, now) {
-      const arenaRadius = (typeof pageWindow.grd === 'number' && pageWindow.grd > 0) ? pageWindow.grd : 16384;
+      const arenaRadius = (typeof pageWindow.grd === 'number' && pageWindow.grd > 0)
+        ? pageWindow.grd
+        : (typeof window !== 'undefined' && typeof window.grd === 'number' && window.grd > 0 ? window.grd : 21600);
       const headX = snake.xx;
       const headY = snake.yy;
       const currentAng = (typeof snake.eang === 'number') ? snake.eang : (snake.ang || 0);
@@ -1289,7 +1292,7 @@
       if (headX > arenaRadius * 1.05 || headY > arenaRadius * 1.05) {
         this.isCenteredWorld = false;
       }
-      const isOffsetCoords = !this.isCenteredWorld && typeof pageWindow.grd === 'number' && pageWindow.grd > 0;
+      const isOffsetCoords = !this.isCenteredWorld;
       const cx = isOffsetCoords ? arenaRadius : 0;
       const cy = isOffsetCoords ? arenaRadius : 0;
       const relX = headX - cx;
@@ -1310,6 +1313,19 @@
       let frontObstacleType = 'none';
       let closestObstacleAngle = 0;
       let frontObstacleAngle = 0;
+
+      // Lethal Threat Trackers (excludes harmless own-body shield)
+      let minLethalDist = sensorRange;
+      let closestLethalType = 'none';
+      let closestLethalScale = scale;
+      let closestLethalSpeed = 5.9;
+      let closestLethalAngle = 0;
+      let frontLethalDist = sensorRange;
+      let frontLethalType = 'none';
+      let frontLethalScale = scale;
+      let frontLethalSpeed = 5.9;
+      let frontLethalAngle = 0;
+
       let forwardObstacleDanger = false;
       let leftClearance = 0;
       let rightClearance = 0;
@@ -1465,6 +1481,24 @@
           frontObstacleType = hitType;
           frontThreatSpeed = hitSpeed;
           frontObstacleAngle = relAngle;
+        }
+
+        // Lethal threat tracking (excludes self body shield which causes zero damage)
+        if (hitType !== 'self' && hitType !== 'none') {
+          if (closestDist < minLethalDist) {
+            minLethalDist = closestDist;
+            closestLethalType = hitType;
+            closestLethalScale = hitScale;
+            closestLethalSpeed = hitSpeed;
+            closestLethalAngle = relAngle;
+          }
+          if (Math.abs(relAngle) <= Math.PI / 4 && closestDist < frontLethalDist) {
+            frontLethalDist = closestDist;
+            frontLethalScale = hitScale;
+            frontLethalType = hitType;
+            frontLethalSpeed = hitSpeed;
+            frontLethalAngle = relAngle;
+          }
         }
 
         // Anti-Encirclement Threat Tracking (v5.9.0):
@@ -1702,6 +1736,16 @@
         frontObstacleType,
         closestObstacleAngle,
         frontObstacleAngle,
+        minLethalDist,
+        closestLethalType,
+        closestLethalScale,
+        closestLethalSpeed,
+        closestLethalAngle,
+        frontLethalDist,
+        frontLethalType,
+        frontLethalScale,
+        frontLethalSpeed,
+        frontLethalAngle,
         selfShieldSide,
         frontThreatSpeed,
         nearestThreatSpeed,
@@ -1788,6 +1832,16 @@
         frontObstacleType = 'none',
         closestObstacleAngle = 0,
         frontObstacleAngle = 0,
+        closestLethalType = 'none',
+        closestLethalDist = 2000,
+        closestLethalAngle = 0,
+        closestLethalScale = scale,
+        closestLethalSpeed = 5.9,
+        frontLethalType = 'none',
+        frontLethalDist = 2000,
+        frontLethalAngle = 0,
+        frontLethalScale = scale,
+        frontLethalSpeed = 5.9,
         selfShieldSide = 0,
         frontThreatSpeed = 5.9,
         nearestThreatSpeed = 5.9,
@@ -2133,6 +2187,13 @@
         }
       }
 
+      const activeLethalType = frontLethalType !== 'none' ? frontLethalType : closestLethalType;
+      const activeLethalDist = frontLethalType !== 'none' ? frontLethalDist : closestLethalDist;
+      const activeLethalAngle = frontLethalType !== 'none' ? frontLethalAngle : closestLethalAngle;
+      const activeLethalScale = frontLethalType !== 'none' ? frontLethalScale : closestLethalScale;
+      const activeLethalSpeed = frontLethalType !== 'none' ? frontLethalSpeed : closestLethalSpeed;
+      const lethalMassRatio = activeLethalScale / Math.max(0.01, scale);
+
       const activeThreatAngle = frontObstacleType !== 'none' ? frontObstacleAngle : closestObstacleAngle;
       this.flightRecorder.recordFrame({
         t: this.survivalTime,
@@ -2145,11 +2206,11 @@
         len: (typeof snake.sct === 'number' && snake.sct > 0) ? snake.sct : Math.floor(currentScore / 10),
         stance: this.combatStance || 'FORAGE',
         normWallDist,
-        threatDist: dangerSource,
-        threatType: frontObstacleType !== 'none' ? frontObstacleType : closestObstacleType,
-        threatAngle: activeThreatAngle,
-        threatMassRatio: this.massRatio || 1.0,
-        threatSpeed,
+        threatDist: activeLethalType !== 'none' ? activeLethalDist : dangerSource,
+        threatType: activeLethalType !== 'none' ? activeLethalType : (frontObstacleType !== 'none' ? frontObstacleType : closestObstacleType),
+        threatAngle: activeLethalType !== 'none' ? activeLethalAngle : activeThreatAngle,
+        threatMassRatio: activeLethalType !== 'none' ? lethalMassRatio : (this.massRatio || 1.0),
+        threatSpeed: activeLethalType !== 'none' ? activeLethalSpeed : threatSpeed,
         turnDelta,
         isBoosting: this.isBoosting,
         selfShieldSide,
@@ -2254,6 +2315,23 @@
         : (state.currentScore || (snake.sc ? Math.floor(15 * (snake.sc - 1) / 0.001) : 0));
       const currentSpeed = (typeof snake.sp === 'number' && snake.sp > 0) ? snake.sp : (isHumanBoosting ? 14 : 5.9);
 
+      const activeLethalType = (state.frontLethalType && state.frontLethalType !== 'none')
+        ? state.frontLethalType
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalType : 'none');
+      const activeLethalDist = (state.frontLethalType && state.frontLethalType !== 'none')
+        ? state.frontLethalDist
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalDist : (Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist));
+      const activeLethalAngle = (state.frontLethalType && state.frontLethalType !== 'none')
+        ? state.frontLethalAngle
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalAngle : (state.frontObstacleType !== 'none' ? state.frontObstacleAngle : state.closestObstacleAngle));
+      const activeLethalScale = (state.frontLethalType && state.frontLethalType !== 'none')
+        ? state.frontLethalScale
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalScale : (state.frontThreatScale || 1));
+      const activeLethalSpeed = (state.frontLethalType && state.frontLethalType !== 'none')
+        ? state.frontLethalSpeed
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalSpeed : (state.frontThreatSpeed || 5.9));
+      const lethalMassRatio = activeLethalScale / Math.max(0.01, snake.sc || 1);
+
       this.flightRecorder.recordFrame({
         t: this.survivalTime,
         x: snake.xx ?? 0,
@@ -2265,11 +2343,11 @@
         len: (typeof snake.sct === 'number' && snake.sct > 0) ? snake.sct : Math.floor(currentScore / 10),
         stance: 'TEACHER',
         normWallDist: state.normWallDist,
-        threatDist: Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist,
-        threatType: state.frontObstacleType !== 'none' ? state.frontObstacleType : state.closestObstacleType,
-        threatAngle: state.frontObstacleType !== 'none' ? state.frontObstacleAngle : state.closestObstacleAngle,
-        threatMassRatio: (state.frontThreatScale || 1) / Math.max(0.01, snake.sc || 1),
-        threatSpeed: state.frontThreatSpeed || 5.9,
+        threatDist: activeLethalType !== 'none' ? activeLethalDist : (Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist),
+        threatType: activeLethalType !== 'none' ? activeLethalType : (state.frontObstacleType !== 'none' ? state.frontObstacleType : state.closestObstacleType),
+        threatAngle: activeLethalType !== 'none' ? activeLethalAngle : (state.frontObstacleType !== 'none' ? state.frontObstacleAngle : state.closestObstacleAngle),
+        threatMassRatio: lethalMassRatio,
+        threatSpeed: activeLethalSpeed,
         turnDelta: humanSteerTarget,
         isBoosting: isHumanBoosting,
         selfShieldSide: state.selfShieldSide || 0,

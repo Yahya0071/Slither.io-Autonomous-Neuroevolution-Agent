@@ -365,3 +365,59 @@ test('Controller & Agent export parity: exportCheckpoint includes telemetry and 
   );
 });
 
+test('offset coordinates autopsy: snake in midfield (x: 33088, y: 35181, normWallDist: 0.82) is not misclassified as ARENA_WALL', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  // Snapshot from real Slither.io offset coordinates game (grd = 21600, center at 21600, 21600)
+  // Distance from center is ~17,788px (midfield normWallDist ~0.82)
+  rec.recordFrame({
+    t: 22.2,
+    x: 33088,
+    y: 35181,
+    sp: 5.8,
+    score: 8,
+    headRadius: 14,
+    stance: 'DEFEND',
+    normWallDist: 0.82,
+    threatDist: 25,
+    threatType: 'body',
+    threatSpeed: 9.5
+  });
+
+  const autopsy = rec.deduceDeathAutopsy({
+    survivalTime: 22.2,
+    finalScore: 8,
+    peakLength: 8,
+    generation: 150,
+    episode: 1
+  });
+
+  // Old bug computed Math.hypot(33088, 35181) = 48296 >= 21250, falsely claiming ARENA_WALL.
+  // With normWallDist = 0.82 < 0.94, it must correctly classify as FLANK_CUTOFF or BODY_COLLISION.
+  assert.notEqual(autopsy.cause, 'ARENA_WALL', 'midfield death must never be misdiagnosed as ARENA_WALL');
+  assert.equal(autopsy.cause, 'FLANK_CUTOFF', 'fast enemy cutting across must be classified as FLANK_CUTOFF');
+  assert.equal(autopsy.killerProfile.type, 'body');
+});
+
+test('killerProfile never reports type: self on self-body shielding', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  // Snake coiling where ray 8 detects own body segment ('self')
+  const snake = { id: 'me', xx: 100, yy: 100, eang: 0, sc: 1.0, sp: 5.9, sct: 10, pts: [] };
+  // Add self segments forming a loop around head
+  for (let p = 0; p < 30; p++) {
+    snake.pts.push({ xx: 100 + Math.cos(p * 0.2) * 50, yy: 100 + Math.sin(p * 0.2) * 50 });
+  }
+
+  agent.evaluate(snake, [], [], []);
+  agent.onDeath(false);
+
+  const autopsy = agent.flightRecorder.lastDeathAutopsy;
+  if (autopsy && autopsy.killerProfile) {
+    assert.notEqual(autopsy.killerProfile.type, 'self', 'killerProfile must never attribute death to self');
+  }
+});
+
