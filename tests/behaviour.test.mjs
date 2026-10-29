@@ -1165,3 +1165,79 @@ test('slipstream wake drafting: boosts food target priority and sprints to harve
   const decision = agent.evaluate(snake, [], foods, []);
   assert.equal(decision.isBoosting, true, 'must activate slipstream drafting sprint to harvest enemy boost wake');
 });
+
+// ---------------------------------------------------------------------------
+// 10. Corpse-Cluster Magnet & Contested-Loot Scavenger Caution (v5.10.4)
+// ---------------------------------------------------------------------------
+test('post-kill corpse cluster magnet: enters VACUUM and steers back toward dense corpse feast', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+  agent.previousScore = 100;
+  agent.peakLength = 100;
+  agent.boostFuel = 1.0;
+  agent.boostCooldown = 0;
+
+  // Single ambient pellet directly ahead at distance 50
+  const foods = [
+    { xx: 50, yy: 0, sz: 3, eaten: false, dying: false }
+  ];
+
+  // Cluster of 10 dense corpse pellets (sz = 7) behind/beside at ~135 degrees (x: -180, y: 180)
+  const epicenter = { x: -180, y: 180 };
+  for (let i = 0; i < 10; i++) {
+    foods.push({
+      xx: epicenter.x + (i % 3) * 15,
+      yy: epicenter.y + Math.floor(i / 3) * 15,
+      sz: 7.0,
+      eaten: false,
+      dying: false
+    });
+  }
+
+  // Set post-kill epicenter and active vacuum window
+  const now = clock.now();
+  agent.lastKillEpicenter = { x: epicenter.x, y: epicenter.y, timestamp: now };
+  agent.vacuumActiveUntil = now + 6500;
+
+  const decision = agent.evaluate(snake, [], foods, []);
+  assert.equal(decision.stance, 'VACUUM', 'must enter VACUUM stance for corpse feast');
+  // Target angle should steer back toward the cluster (positive angle toward +y, -x)
+  assert.ok(decision.targetAngle > 0.5, `must steer toward corpse cluster behind/beside head, got targetAngle: ${decision.targetAngle}`);
+});
+
+test('contested-loot scavenger caution: vetos boost and offsets away from rival scavenger', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 200, pts: [] };
+  agent.previousScore = 200;
+  agent.peakLength = 200;
+  agent.boostFuel = 1.0;
+  agent.boostCooldown = 0;
+
+  // Corpse cluster at distance 250 ahead-left
+  const foods = [];
+  for (let i = 0; i < 8; i++) {
+    foods.push({
+      xx: 200 + (i % 3) * 10,
+      yy: 150 + Math.floor(i / 3) * 10,
+      sz: 7.0,
+      eaten: false,
+      dying: false
+    });
+  }
+
+  // Rival scavenger head near the corpse cluster (x: 210, y: 160)
+  const rival = {
+    id: 'rival_scavenger',
+    xx: 210,
+    yy: 160,
+    eang: Math.PI,
+    sc: 1.1,
+    sp: 5.9,
+    pts: []
+  };
+
+  const decision = agent.evaluate(snake, [rival], foods, []);
+  assert.equal(decision.stance, 'VACUUM', 'must enter VACUUM stance');
+  // Must NOT blind-boost into the contested loot
+  assert.equal(decision.isBoosting, false, 'must veto boost when rival is contesting the corpse loot');
+});

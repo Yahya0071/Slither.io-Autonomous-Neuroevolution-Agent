@@ -525,3 +525,58 @@ test('HUNT stance: agent actively pursues nearby smaller snake when safe', () =>
   // In any case, dangerUrgency should be low (no danger present) so we should not be in DEFEND
   assert.notEqual(agent.combatStance, 'DEFEND', 'should not panic-defend against a single small prey');
 });
+
+test('flank lethal distance (minLethalDist): records killerProfile.dist < 50 and classifies FLANK_CUTOFF', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  const snake = { id: 'me', xx: 1000, yy: 1000, eang: 0, sc: 1.0, sp: 5.9, sct: 20, pts: [] };
+
+  // Place a fast boosting enemy body segment on Ray 5 (-67.5 deg, dist = 22)
+  const angleRad = - (3 * Math.PI / 8); // -67.5 degrees
+  const enemy = {
+    id: 'fast_cutter',
+    xx: 1000 + Math.cos(angleRad) * 40,
+    yy: 1000 + Math.sin(angleRad) * 40,
+    eang: 0,
+    sc: 1.0,
+    sp: 11.4,
+    pts: [
+      { xx: 1000 + Math.cos(angleRad) * 22, yy: 1000 + Math.sin(angleRad) * 22 }
+    ]
+  };
+
+  agent.evaluate(snake, [enemy], [], []);
+  agent.onDeath(false);
+
+  const autopsy = agent.flightRecorder.lastDeathAutopsy;
+  assert.ok(autopsy, 'autopsy must be generated');
+  assert.equal(autopsy.cause, 'FLANK_CUTOFF', 'fast enemy cutting across flank must be classified as FLANK_CUTOFF');
+  assert.ok(autopsy.killerProfile, 'killerProfile must exist');
+  assert.ok(autopsy.killerProfile.dist < 50, `killerProfile.dist must be close (<50), got: ${autopsy.killerProfile.dist}`);
+});
+
+test('post-death telemetry preservation: exporting checkpoint immediately after onDeath() preserves metrics', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 50, pts: [] };
+
+  // Run 10 frames of evaluate
+  for (let i = 0; i < 10; i++) {
+    agent.evaluate(snake, [], [], []);
+  }
+
+  // Trigger death (which runs resetLife())
+  agent.onDeath(false);
+
+  // Immediately export checkpoint right after death
+  const serialized = agent.exportCheckpoint();
+  const parsed = JSON.parse(serialized);
+
+  assert.ok(parsed.telemetry, 'telemetry must exist in exported checkpoint');
+  assert.ok(parsed.telemetry.totalRecordedFrames > 0, `totalRecordedFrames must be preserved (>0), got: ${parsed.telemetry.totalRecordedFrames}`);
+  assert.ok(parsed.telemetry.stanceDutyCycles, 'stanceDutyCycles must be preserved');
+  assert.ok(parsed.telemetry.zoneDistribution, 'zoneDistribution must be preserved');
+  assert.notEqual(parsed.telemetry.zoneDistribution.center, '0%', 'zoneDistribution must reflect center activity');
+});

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slither.io Autonomous Machine Learning Agent (SlitherML)
 // @namespace    https://slither.io/
-// @version      5.10.3
+// @version      5.10.4
 // @description  32-input Hybrid Neuroevolution + Online Imitation Learning AI for Slither.io. 16 proximity rays, 8 food sectors, self-collision detection, trajectory prediction, and teacher-mode backpropagation whose lessons must win an autonomous 3-life evaluation before being saved.
 // @author       DeepMind Antigravity AI
 // @match        *://slither.io/*
@@ -15,7 +15,7 @@
 
 /**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -41,7 +41,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -332,8 +332,14 @@
         CONSTRICT: 0,
         DEFEND: 0,
         VACUUM: 0,
+        HUNT: 0,
         TEACHER: 0
       };
+
+      this.lastLifeFrames = 0;
+      this.lastLifeDutyCycles = {};
+      this.lastLifeZones = { center: '0%', midfield: '0%', perimeter: '0%' };
+      this.lastLifeMilestones = {};
 
       // Significant Incidents Log (max 25 per life)
       this.maxIncidents = 25;
@@ -348,6 +354,12 @@
     resetLife() {
       if (this.waypoints.length > 0) {
         this.lastLifeWaypoints = this.waypoints.slice(-40);
+      }
+      if (this.totalFrames > 0) {
+        this.lastLifeFrames = this.totalFrames;
+        this.lastLifeDutyCycles = this._calculateStanceDutyCycles();
+        this.lastLifeZones = this._calculateZoneDistribution();
+        this.lastLifeMilestones = { ...this.growthMilestones };
       }
       this.frameBuffer = [];
       this.bufferIndex = 0;
@@ -574,14 +586,15 @@
     }
 
     getTelemetrySummary() {
+      const useLastLife = this.totalFrames < 30 && this.lastLifeFrames > 0;
       return {
         version: '1.0.0',
-        totalRecordedFrames: this.totalFrames,
+        totalRecordedFrames: useLastLife ? this.lastLifeFrames : this.totalFrames,
         lastDeathAutopsy: this.lastDeathAutopsy,
         recentEpisodeHistory: [...this.recentEpisodes],
-        growthMilestones: { ...this.growthMilestones },
-        stanceDutyCycles: this._calculateStanceDutyCycles(),
-        zoneDistribution: this._calculateZoneDistribution(),
+        growthMilestones: useLastLife ? { ...this.lastLifeMilestones } : { ...this.growthMilestones },
+        stanceDutyCycles: useLastLife ? { ...this.lastLifeDutyCycles } : this._calculateStanceDutyCycles(),
+        zoneDistribution: useLastLife ? { ...this.lastLifeZones } : this._calculateZoneDistribution(),
         pathfinderBreadcrumbs: this.lastLifeWaypoints.length > 0
           ? [...this.lastLifeWaypoints]
           : this.waypoints.slice(-40)
@@ -592,6 +605,7 @@
       if (!telemetry || typeof telemetry !== 'object') return;
       if (typeof telemetry.totalRecordedFrames === 'number') {
         this.totalFrames = telemetry.totalRecordedFrames;
+        this.lastLifeFrames = telemetry.totalRecordedFrames;
       }
       if (telemetry.lastDeathAutopsy) {
         this.lastDeathAutopsy = telemetry.lastDeathAutopsy;
@@ -601,6 +615,13 @@
       }
       if (telemetry.growthMilestones && typeof telemetry.growthMilestones === 'object') {
         this.growthMilestones = { ...telemetry.growthMilestones };
+        this.lastLifeMilestones = { ...telemetry.growthMilestones };
+      }
+      if (telemetry.stanceDutyCycles && typeof telemetry.stanceDutyCycles === 'object') {
+        this.lastLifeDutyCycles = { ...telemetry.stanceDutyCycles };
+      }
+      if (telemetry.zoneDistribution && typeof telemetry.zoneDistribution === 'object') {
+        this.lastLifeZones = { ...telemetry.zoneDistribution };
       }
       if (Array.isArray(telemetry.pathfinderBreadcrumbs)) {
         this.lastLifeWaypoints = telemetry.pathfinderBreadcrumbs.slice(-40);
@@ -1172,7 +1193,7 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 550 units (v5.10.3: expanded from 420)
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.4: expanded from 420)
           if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
@@ -1204,7 +1225,7 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            // v5.10.3: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            // v5.10.4: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
             if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
@@ -1258,7 +1279,7 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            // v5.10.3: Extended range to 480 for earlier constriction setup
+            // v5.10.4: Extended range to 480 for earlier constriction setup
             if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
@@ -1313,14 +1334,14 @@
             const combatBounty = Math.round(250 + Math.min(350, Math.max(0, (killRatio - 0.75) * 450)));
             this.fitness += combatBounty;
             this.lastKillEpicenter = { x: record.xx, y: record.yy, timestamp: now };
-            this.vacuumActiveUntil = now + 4000;
+            this.vacuumActiveUntil = now + 6500;
             this.flightRecorder.logIncident('KILL_CONFIRMED', {
               t: this.survivalTime,
               x: record.xx,
               y: record.yy,
               info: `Kill #${this.kills} (+${combatBounty} Bounty, victim scale ${victimScale.toFixed(2)})`
             });
-            console.log(`%c[SlitherML] ⚔️ ENEMY ELIMINATED! Confirmed Kill #${this.kills} (+${combatBounty} Fitness Bounty, victim scale ${victimScale.toFixed(2)} vs self ${myScale.toFixed(2)}). Activating 4s Post-Kill Corpse Vacuum Mode!`, 'color: #ff0055; font-weight: bold;');
+            console.log(`%c[SlitherML] ⚔️ ENEMY ELIMINATED! Confirmed Kill #${this.kills} (+${combatBounty} Fitness Bounty, victim scale ${victimScale.toFixed(2)} vs self ${myScale.toFixed(2)}). Activating 6.5s Post-Kill Corpse Vacuum Mode!`, 'color: #ff0055; font-weight: bold;');
           }
           this.enemyTracker.delete(id);
         } else if (now - record.timestamp > 2000) {
@@ -1586,7 +1607,7 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.3):
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.4):
       // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
       // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
       // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
@@ -1623,21 +1644,26 @@
       // and evasive prey are perceived across the full screen (~1200 units).
       const maxNormalFoodDist = Math.max(700, sensorRange * 1.35);
       const maxDebrisDist = 1200;
+      let corpsePelletCount = 0;
 
       const processPellet = (fx, fy, size, isPrey = false) => {
         const dx = fx - headX;
         const dy = fy - headY;
         const dist = Math.hypot(dx, dy);
-        const isHighValue = isPrey || size > 8;
+        const isHighValue = isPrey || size >= 6.5;
         const maxDist = isHighValue ? maxDebrisDist : maxNormalFoodDist;
         if (dist > maxDist || dist < 2) return;
+
+        if (!isPrey && size >= 6.5 && dist < 750) {
+          corpsePelletCount++;
+        }
 
         let pelletAngle = Math.atan2(dy, dx) - currentAng;
         while (pelletAngle < 0) pelletAngle += Math.PI * 2;
         while (pelletAngle >= Math.PI * 2) pelletAngle -= Math.PI * 2;
 
         const sectorIdx = Math.floor(pelletAngle / foodSectorSpan) % this.foodSectorCount;
-        const multiplier = isPrey ? 15.0 : (size > 8 ? 8.0 : 1.0);
+        const multiplier = isPrey ? 15.0 : (size >= 6.5 ? 10.0 : 1.0);
         const weight = (size * multiplier) / (dist * 0.04 + 1);
         this.foodSectors[sectorIdx] += weight;
 
@@ -1645,7 +1671,7 @@
           this.detectedFoods.push({ dx, dy, dist, sz: size, isPrey });
         } else if (isHighValue) {
           // If candidate pool is saturated with ordinary pellets, make room for dead snake drops
-          const replaceIdx = this.detectedFoods.findIndex(f => !f.isPrey && f.sz <= 8);
+          const replaceIdx = this.detectedFoods.findIndex(f => !f.isPrey && f.sz < 6.5);
           if (replaceIdx !== -1) {
             this.detectedFoods[replaceIdx] = { dx, dy, dist, sz: size, isPrey };
           }
@@ -1706,8 +1732,8 @@
       // rather than an arbitrary first-80 slice of world-scan order.
       if (this.detectedFoods.length > 80) {
         this.detectedFoods.sort((a, b) => {
-          const valA = a.isPrey ? 25 : (a.sz > 8 ? 8 : 1);
-          const valB = b.isPrey ? 25 : (b.sz > 8 ? 8 : 1);
+          const valA = a.isPrey ? 25 : (a.sz >= 6.5 ? 12 : 1);
+          const valB = b.isPrey ? 25 : (b.sz >= 6.5 ? 12 : 1);
           const scoreA = a.dist / Math.sqrt(valA);
           const scoreB = b.dist / Math.sqrt(valB);
           return scoreA - scoreB;
@@ -1783,6 +1809,7 @@
         closestObstacleAngle,
         frontObstacleAngle,
         minLethalDist,
+        closestLethalDist: minLethalDist,
         closestLethalType,
         closestLethalScale,
         closestLethalSpeed,
@@ -1797,25 +1824,32 @@
         nearestThreatSpeed,
         encirclementEscape,
         slipstreamTarget,
-        huntCandidate
+        huntCandidate,
+        corpsePelletCount
       };
     }
 
     // Pick the pellet worth steering at: close, valuable, and cheap to reach.
-    // Sharp turns are penalised so the snake will not spin around for a pellet
-    // that is already behind it.
-    _pickFoodTarget(currentAng) {
+    // Enhanced with Corpse Cluster Gravity, Kill-Epicenter Lock & Rival Scavenger Repulsion (v5.10.4)
+    _pickFoodTarget(currentAng, headX = 0, headY = 0, snakes = null) {
       const list = this.detectedFoods;
       if (!list || list.length === 0) return null;
 
       const now = performance.now();
       const isVacuumActive = Boolean(this.lastKillEpicenter && now < this.vacuumActiveUntil);
 
+      // Pre-filter high-value corpse pellets for fast cluster density lookup
+      const corpsePellets = [];
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].sz >= 6.5 && !list[i].isPrey) corpsePellets.push(list[i]);
+      }
+
       let best = null;
       let bestCost = Infinity;
       for (let i = 0; i < list.length; i++) {
         const f = list[i];
-        const isHighValue = f.isPrey || f.sz > 8;
+        const isCorpse = !f.isPrey && f.sz >= 6.5;
+        const isHighValue = f.isPrey || isCorpse;
         const maxTargetDist = (isHighValue || isVacuumActive) ? 1200 : 650;
         if (f.dist < 4 || f.dist > maxTargetDist) continue;
 
@@ -1823,19 +1857,108 @@
         while (error > Math.PI) error -= Math.PI * 2;
         while (error < -Math.PI) error += Math.PI * 2;
 
-        let value = f.isPrey ? 25 : (f.sz > 8 ? 8 : 1);
-        if (isVacuumActive && (f.sz > 8 || f.dist < 500)) {
-          value *= 3.0; // 3x loot priority during post-kill corpse vacuum!
+        let value = f.isPrey ? 25 : (isCorpse ? 8 : 1);
+
+        // 1. Corpse Cluster Density Gravity: dead snakes form dense pellet trails
+        let clusterCount = 0;
+        if (isCorpse && corpsePellets.length > 1) {
+          for (let j = 0; j < corpsePellets.length; j++) {
+            const otherF = corpsePellets[j];
+            if (otherF === f) continue;
+            if (Math.hypot(otherF.dx - f.dx, otherF.dy - f.dy) < 160) {
+              clusterCount++;
+            }
+          }
+          value *= (1 + Math.min(4.5, clusterCount * 0.50));
         }
-        // Slipstream Wake Bonus (v5.9.0):
+
+        // 2. Post-Kill Epicenter Magnet & Turn-Back Relaxation
+        let nearKillEpicenter = false;
+        if (isVacuumActive && this.lastKillEpicenter) {
+          const worldFx = headX + f.dx;
+          const worldFy = headY + f.dy;
+          const distToEpicenter = Math.hypot(worldFx - this.lastKillEpicenter.x, worldFy - this.lastKillEpicenter.y);
+          if (distToEpicenter < 480 || isCorpse || f.dist < 480) {
+            nearKillEpicenter = true;
+            value *= 3.0;
+          }
+        }
+
+        // 3. Slipstream Wake Bonus (v5.9.0)
         if (this.slipstreamTarget && f.dist < 450 && Math.abs(error) < 0.6) {
-          value *= 2.0; // 2x priority to draft in boosting enemy's mass exhaust trail
+          value *= 2.0;
         }
-        const turnPenalty = 1 + 2.2 * (1 - Math.cos(error));
-        const cost = ((f.dist + 60) * turnPenalty) / value;
+
+        // 4. Rival Scavenger Hazard Awareness (avoid nose-to-nose fights over the same pellet)
+        let contestedByRival = false;
+        let rivalBearingSign = 0;
+        if (isHighValue) {
+          const worldFx = headX + f.dx;
+          const worldFy = headY + f.dy;
+          let checkedEnemy = false;
+          if (this.enemyTracker && this.enemyTracker.size > 0) {
+            for (const [, track] of this.enemyTracker.entries()) {
+              const enemyDistToFood = Math.hypot(track.xx - worldFx, track.yy - worldFy);
+              if (enemyDistToFood < 240) {
+                contestedByRival = true;
+                let rBear = Math.atan2(track.yy - headY, track.xx - headX) - currentAng;
+                while (rBear > Math.PI) rBear -= Math.PI * 2;
+                while (rBear < -Math.PI) rBear += Math.PI * 2;
+                rivalBearingSign = rBear >= 0 ? 1 : -1;
+                if (enemyDistToFood < f.dist * 0.90 && enemyDistToFood < 170) {
+                  value *= 0.20;
+                } else {
+                  value *= 0.60;
+                }
+                checkedEnemy = true;
+                break;
+              }
+            }
+          }
+          if (!checkedEnemy && Array.isArray(snakes)) {
+            for (let sIdx = 0; sIdx < snakes.length; sIdx++) {
+              const other = snakes[sIdx];
+              if (!other || other.dead || (other.id !== undefined && other.id === 'me')) continue;
+              const ox = typeof other.xx === 'number' ? other.xx : other.x;
+              const oy = typeof other.yy === 'number' ? other.yy : other.y;
+              if (typeof ox !== 'number' || typeof oy !== 'number') continue;
+              const enemyDistToFood = Math.hypot(ox - worldFx, oy - worldFy);
+              if (enemyDistToFood < 240) {
+                contestedByRival = true;
+                let rBear = Math.atan2(oy - headY, ox - headX) - currentAng;
+                while (rBear > Math.PI) rBear -= Math.PI * 2;
+                while (rBear < -Math.PI) rBear += Math.PI * 2;
+                rivalBearingSign = rBear >= 0 ? 1 : -1;
+                if (enemyDistToFood < f.dist * 0.90 && enemyDistToFood < 170) {
+                  value *= 0.20;
+                } else {
+                  value *= 0.60;
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        // Relax turn penalty when turning back toward our own kill or a massive corpse cluster
+        const turnWeight = (nearKillEpicenter || clusterCount >= 3) ? 0.55 : 2.2;
+        const turnPenalty = 1 + turnWeight * (1 - Math.cos(error));
+        const cost = ((f.dist + 50) * turnPenalty) / value;
         if (cost < bestCost) {
           bestCost = cost;
-          best = { error, dist: f.dist, value, dx: f.dx, dy: f.dy, sz: f.sz, isPrey: f.isPrey };
+          best = {
+            error,
+            dist: f.dist,
+            value,
+            dx: f.dx,
+            dy: f.dy,
+            sz: f.sz,
+            isPrey: f.isPrey,
+            isCorpse,
+            clusterCount,
+            contestedByRival,
+            rivalBearingSign
+          };
         }
       }
       return best;
@@ -1880,6 +2003,7 @@
         closestObstacleAngle = 0,
         frontObstacleAngle = 0,
         closestLethalType = 'none',
+        minLethalDist = 2000,
         closestLethalDist = 2000,
         closestLethalAngle = 0,
         closestLethalScale = scale,
@@ -1894,8 +2018,13 @@
         nearestThreatSpeed = 5.9,
         encirclementEscape = null,
         slipstreamTarget = null,
-        huntCandidate = null
+        huntCandidate = null,
+        corpsePelletCount = 0
       } = state;
+
+      // Pre-compute primary food target once for Stance Arbiter, Steering, and Boost Governor
+      const foodTarget = this._pickFoodTarget(currentAng, snake.xx, snake.yy, snakes);
+      const richCorpseNearby = Boolean(foodTarget && (foodTarget.isCorpse || foodTarget.clusterCount >= 2) && foodTarget.dist < 850);
 
       this.closestObstacleType = closestObstacleType;
       this.frontObstacleType = frontObstacleType;
@@ -1955,7 +2084,7 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.3):
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.4):
       // Detect encirclement early (5 rays) and always prefer slit breach over COIL when a gap exists.
       // Even a narrow gap (isOpen with 2.5× threshold) should be forced: dying trying is better than
       // waiting in COIL until the loop closes fully.
@@ -1981,20 +2110,18 @@
       else if (constrictCandidate && !outerPredatorNearby && massRatio < 1.15 && dangerUrgency < 0.25 && normWallDist < 0.88) {
         stance = 'CONSTRICT';
       }
-      // 4. ATTACK STANCE: Lead intercept predator strike (from dzaczek/slbot)
-      // v5.10.3: Removed minBoostScore gate from stance entry — angle-only intercept works at any size.
-      //          canBoostAttack flag on candidate governs whether we sprint (requires fuel + score).
-      //          Never attempt head-on strike against behemoth threats (massRatio > 1.5)
+      // 4. POST-KILL CORPSE VACUUM & RICH CORPSE HARVEST (v5.10.4):
+      // Immediately harvest massive corpse feast instead of wandering off to chase full-health snakes!
+      // Priority above HUNT and above distant ATTACK when post-kill vacuum or rich corpse is present.
+      else if (((this.lastKillEpicenter && now < this.vacuumActiveUntil) || richCorpseNearby) && dangerUrgency < 0.38) {
+        stance = 'VACUUM';
+      }
+      // 5. ATTACK STANCE: Lead intercept predator strike (from dzaczek/slbot)
       else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3) {
         stance = 'ATTACK';
       }
-      // 5. VACUUM STANCE: Post-kill corpse loot gathering
-      else if (this.lastKillEpicenter && now < this.vacuumActiveUntil && dangerUrgency < 0.3) {
-        stance = 'VACUUM';
-      }
       // 6. HUNT STANCE: Actively pursue nearby snakes to pressure/kill them.
       // Only when safe (dangerUrgency low) and there's a valid target.
-      // Smaller prey = high-priority hunt. Larger but reachable = opportunistic pressure.
       else if (huntCandidate && dangerUrgency < 0.25 && !wallDanger && normWallDist < 0.86) {
         stance = 'HUNT';
       }
@@ -2021,7 +2148,7 @@
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.10.3: active from 5 rays, clearance lowered):
+            // Anti-Encirclement Slit Breaching (v5.10.4: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
             const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
             this.flightRecorder.logIncident(breachTag, {
@@ -2137,16 +2264,16 @@
         }
         // E. VACUUM & FORAGE STANCE: Dual-Tier Food & Corpse Scavenging + Exploratory Sweep
         else {
-          const foodTarget = this._pickFoodTarget(currentAng);
           this.foodTargetError = foodTarget ? foodTarget.error : null;
           if (foodTarget) {
             let foodSteer = Math.max(-1, Math.min(1, foodTarget.error / 1.85));
 
-            // "The Cross" Perpendicular Loot Sweep (Pro Rule):
-            // When vacuuming a large corpse drop (value >= 8), approach with a slight tangential
-            // crossing offset rather than a dead-on head-first collision course.
-            // This sweeps a broader pellet swath with our body flank while shielding against rival scavengers.
-            if (stance === 'VACUUM' && foodTarget.value >= 8 && foodTarget.dist > 120 && foodTarget.dist < 600) {
+            // Contested-Loot Scavenger Caution & "The Cross" Perpendicular Loot Sweep:
+            if (foodTarget.contestedByRival && foodTarget.rivalBearingSign !== 0) {
+              // Instead of steering blindly into rival scavenger, offset away from rival bearing
+              const crossOffset = -foodTarget.rivalBearingSign * 0.28;
+              foodSteer = Math.max(-1, Math.min(1, (foodTarget.error / 1.85) + crossOffset));
+            } else if (stance === 'VACUUM' && foodTarget.value >= 8 && foodTarget.dist > 120 && foodTarget.dist < 600) {
               const crossOffset = foodTarget.error >= 0 ? 0.20 : -0.20;
               foodSteer = Math.max(-1, Math.min(1, (foodTarget.error / 1.85) + crossOffset));
             }
@@ -2155,6 +2282,11 @@
             this.foodSteerEma = this.foodSteerEma * (1 - steerWeight) + foodSteer * steerWeight;
             const assist = (stance === 'VACUUM' ? 0.95 : 0.85) * (1 - dangerUrgency);
             turnDelta = turnDelta * (1 - assist) + this.foodSteerEma * assist;
+
+            // When in VACUUM and a rival snake is close while we eat, blend in evasive clearance earlier
+            if (stance === 'VACUUM' && dangerUrgency > 0.15) {
+              turnDelta = turnDelta * (1 - dangerUrgency * 0.7) + reflexSign * Math.min(1.0, dangerUrgency * 1.15);
+            }
           } else {
             this.foodSteerEma *= 0.8;
             // Active Exploratory Patrol (Anti-Stall from dzaczek/slbot):
@@ -2210,7 +2342,7 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.10.3: wider alignment cone 0.75 rad, lower fuel 0.10):
+          // Emergency Slit Breach Sprint (v5.10.4: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
@@ -2244,8 +2376,10 @@
         shouldBoost = false;
       } else if (stance === 'VACUUM') {
         // Corpse vacuum sprint: rapid rush to snatch loot before rivals arrive
-        const foodTarget = this._pickFoodTarget(currentAng);
+        // Veto sprint if rival scavengers are contesting the loot, traffic is dense, or danger is elevated
         shouldBoost = forwardClear && healthyLength && Boolean(foodTarget) && foodTarget.dist < 400 &&
+                      Math.abs(foodTarget.error) < 0.50 &&
+                      !foodTarget.contestedByRival && inputs[31] < 0.5 && dangerUrgency < 0.15 &&
                       this.boostFuel > 0.20 && this.boostCooldown <= 0;
       } else if (stance === 'HUNT') {
         // Sprint to catch fleeing prey when aligned, no danger ahead, and fuel available
@@ -2259,7 +2393,6 @@
                       this.boostFuel > 0.30 && this.boostCooldown <= 0;
       } else {
         // Foraging sprint: Mass-ROI governed sprint (from JuiHsiu/Slither-DRL)
-        const foodTarget = this._pickFoodTarget(currentAng);
         const estBurnTimeSec = foodTarget ? (foodTarget.dist / (currentSpeed * 1.85 * 60)) : 1.0;
         const estMassBurned = estBurnTimeSec * 16.0;
         const positiveROI = Boolean(foodTarget) && (foodTarget.value * 2.5 >= estMassBurned);
@@ -2317,7 +2450,7 @@
       }
 
       const activeLethalType = frontLethalType !== 'none' ? frontLethalType : closestLethalType;
-      const activeLethalDist = frontLethalType !== 'none' ? frontLethalDist : closestLethalDist;
+      const activeLethalDist = frontLethalType !== 'none' ? frontLethalDist : minLethalDist;
       const activeLethalAngle = frontLethalType !== 'none' ? frontLethalAngle : closestLethalAngle;
       const activeLethalScale = frontLethalType !== 'none' ? frontLethalScale : closestLethalScale;
       const activeLethalSpeed = frontLethalType !== 'none' ? frontLethalSpeed : closestLethalSpeed;
@@ -2450,7 +2583,7 @@
         : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalType : 'none');
       const activeLethalDist = (state.frontLethalType && state.frontLethalType !== 'none')
         ? state.frontLethalDist
-        : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalDist : (Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist));
+        : ((state.closestLethalType && state.closestLethalType !== 'none') ? (state.minLethalDist ?? state.closestLethalDist ?? 2000) : (Number.isFinite(state.frontObstacleDist) ? state.frontObstacleDist : state.minObstacleDist));
       const activeLethalAngle = (state.frontLethalType && state.frontLethalType !== 'none')
         ? state.frontLethalAngle
         : ((state.closestLethalType && state.closestLethalType !== 'none') ? state.closestLethalAngle : (state.frontObstacleType !== 'none' ? state.frontObstacleAngle : state.closestObstacleAngle));
@@ -3481,6 +3614,9 @@
           } else if (stance === 'CONSTRICT') {
             elStance.textContent = '🐍 CONSTRICT';
             elStance.style.color = '#c084fc';
+          } else if (stance === 'HUNT') {
+            elStance.textContent = '🎯 HUNT';
+            elStance.style.color = '#fb923c';
           } else if (stance === 'ATTACK') {
             elStance.textContent = '⚔️ ATTACK';
             elStance.style.color = '#ff0055';
@@ -3729,6 +3865,8 @@
           mainColor = '#a855f7';
         } else if (stance === 'CONSTRICT') {
           mainColor = '#c084fc';
+        } else if (stance === 'HUNT') {
+          mainColor = '#fb923c';
         } else if (stance === 'ATTACK') {
           mainColor = '#ff0055';
         } else if (stance === 'DEFEND') {
@@ -3802,5 +3940,5 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();
