@@ -1489,7 +1489,9 @@
                 const pt = other.pts[pIdx];
                 if (!pt || pt.dying) continue;
                 const dxSeg = pt.xx - headX;
+                if (dxSeg > closestDist + hitThreshold || dxSeg < -(closestDist + hitThreshold)) continue;
                 const dySeg = pt.yy - headY;
+                if (dySeg > closestDist + hitThreshold || dySeg < -(closestDist + hitThreshold)) continue;
                 const projSeg = dxSeg * cosR + dySeg * sinR;
                 if (projSeg > 0 && projSeg < closestDist + hitThreshold) {
                   const perpSegSq = (dxSeg * dxSeg + dySeg * dySeg) - projSeg * projSeg;
@@ -1517,7 +1519,9 @@
             const pt = snake.pts[pIdx];
             if (!pt || pt.dying) continue;
             const dxSelf = pt.xx - headX;
+            if (dxSelf > closestDist + selfHitThreshold || dxSelf < -(closestDist + selfHitThreshold)) continue;
             const dySelf = pt.yy - headY;
+            if (dySelf > closestDist + selfHitThreshold || dySelf < -(closestDist + selfHitThreshold)) continue;
             const projSelf = dxSelf * cosR + dySelf * sinR;
             if (projSelf > 0 && projSelf < closestDist + selfHitThreshold) {
               const perpSelfSq = (dxSelf * dxSelf + dySelf * dySelf) - projSelf * projSelf;
@@ -1666,13 +1670,17 @@
       const maxDebrisDist = 1200;
       let corpsePelletCount = 0;
 
+      let replacePointer = 0;
       const processPellet = (fx, fy, size, isPrey = false) => {
-        const dx = fx - headX;
-        const dy = fy - headY;
-        const dist = Math.hypot(dx, dy);
         const isHighValue = isPrey || size >= 6.5;
         const maxDist = isHighValue ? maxDebrisDist : maxNormalFoodDist;
-        if (dist > maxDist || dist < 2) return;
+        const dx = fx - headX;
+        if (dx > maxDist || dx < -maxDist) return;
+        const dy = fy - headY;
+        if (dy > maxDist || dy < -maxDist) return;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > maxDist * maxDist || distSq < 4) return;
+        const dist = Math.sqrt(distSq);
 
         if (!isPrey && size >= 6.5 && dist < 750) {
           corpsePelletCount++;
@@ -1689,11 +1697,13 @@
 
         if (this.detectedFoods.length < 250) {
           this.detectedFoods.push({ dx, dy, dist, sz: size, isPrey });
-        } else if (isHighValue) {
-          // If candidate pool is saturated with ordinary pellets, make room for dead snake drops
-          const replaceIdx = this.detectedFoods.findIndex(f => !f.isPrey && f.sz < 6.5);
-          if (replaceIdx !== -1) {
-            this.detectedFoods[replaceIdx] = { dx, dy, dist, sz: size, isPrey };
+        } else if (isHighValue && replacePointer < 250) {
+          // Fast O(1) replacement instead of O(N) findIndex on thousands of pellets
+          while (replacePointer < 250 && (this.detectedFoods[replacePointer].isPrey || this.detectedFoods[replacePointer].sz >= 6.5)) {
+            replacePointer++;
+          }
+          if (replacePointer < 250) {
+            this.detectedFoods[replacePointer++] = { dx, dy, dist, sz: size, isPrey };
           }
         }
       };
@@ -1888,7 +1898,11 @@
           for (let j = 0; j < corpsePellets.length; j++) {
             const otherF = corpsePellets[j];
             if (otherF === f) continue;
-            if (Math.hypot(otherF.dx - f.dx, otherF.dy - f.dy) < 160) {
+            const cdx = otherF.dx - f.dx;
+            if (cdx > 160 || cdx < -160) continue;
+            const cdy = otherF.dy - f.dy;
+            if (cdy > 160 || cdy < -160) continue;
+            if (cdx * cdx + cdy * cdy < 25600) {
               clusterCount++;
             }
           }
@@ -3882,16 +3896,12 @@
           if (df.isPrey) {
             // Evasive glowing prey orb
             ctx.fillStyle = '#ffb703';
-            ctx.shadowColor = '#ffb703';
-            ctx.shadowBlur = 8;
             ctx.beginPath();
             ctx.arc(px, py, 6 * zoom, 0, Math.PI * 2);
             ctx.fill();
           } else if (df.sz > 8) {
             // High-value dead snake drop / cluster
             ctx.fillStyle = 'rgba(0, 245, 212, 0.9)';
-            ctx.shadowColor = '#00f5d4';
-            ctx.shadowBlur = 6;
             ctx.beginPath();
             ctx.arc(px, py, 4.5 * zoom, 0, Math.PI * 2);
             ctx.fill();
@@ -3956,8 +3966,6 @@
 
         ctx.strokeStyle = mainColor;
         ctx.lineWidth = 3.5;
-        ctx.shadowColor = mainColor;
-        ctx.shadowBlur = 10;
 
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
@@ -3974,8 +3982,6 @@
           ctx.save();
           ctx.strokeStyle = 'rgba(168, 85, 247, 0.8)';
           ctx.lineWidth = 3;
-          ctx.shadowColor = '#a855f7';
-          ctx.shadowBlur = 12;
           ctx.beginPath();
           ctx.arc(centerX, centerY, 48 * zoom, 0, Math.PI * 2);
           ctx.stroke();
@@ -3989,8 +3995,6 @@
           const ay = centerY + (at.interceptY - snake.yy) * zoom;
           ctx.strokeStyle = '#ff0055';
           ctx.lineWidth = 2;
-          ctx.shadowColor = '#ff0055';
-          ctx.shadowBlur = 8;
           ctx.beginPath();
           ctx.arc(ax, ay, 10 * zoom, 0, Math.PI * 2);
           ctx.moveTo(ax - 14 * zoom, ay);
