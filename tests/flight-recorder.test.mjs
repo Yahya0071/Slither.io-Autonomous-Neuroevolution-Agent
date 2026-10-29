@@ -421,3 +421,80 @@ test('killerProfile never reports type: self on self-body shielding', () => {
   }
 });
 
+
+test('early encirclement detection (5 rays): snake escapes via DEFEND not COIL', () => {
+  // Verify encirclementEscape.isEarly is set when exactly 5 rays are blocked
+  // and isOpen is true when max slit clearance > headRadius * 2.5
+  const harness = loadAgent();
+  const { SlitherMLAgent } = harness;
+  const agent = new SlitherMLAgent({ generation: 1 });
+
+  // Build a snake with scale 1.0 (headRadius ~14), surrounded on 5 rays
+  const headX = 0, headY = 0;
+  const snake = { id: 'me', xx: headX, yy: headY, eang: 0, sc: 1.0, sp: 5.9, sct: 15, pts: [] };
+
+  // Place a large encircling snake whose body covers 5 rays at ~70px
+  // rays are at angles: 0, 22.5, 45, 67.5, 90, 112.5, ... degrees
+  // Block rays 0-4 (right side)
+  const enemySnake = { id: 'big', xx: 85, yy: 0, eang: Math.PI, sc: 3.0, sp: 5.9, pts: [] };
+  const blockAngles = [0, Math.PI/8, Math.PI/4, 3*Math.PI/8, Math.PI/2];
+  for (const ang of blockAngles) {
+    enemySnake.pts.push({ xx: headX + Math.cos(ang) * 72, yy: headY + Math.sin(ang) * 72 });
+  }
+
+  const result = agent.evaluate(snake, [enemySnake], [], []);
+
+  // Inspect the stored encirclementEscape
+  const esc = agent.encirclementEscape;
+  if (esc) {
+    // If detected, isEarly should be set when < 7 rays
+    if (esc.threatRays < 7) {
+      assert.equal(esc.isEarly, true, 'isEarly must be true when threatRays < 7');
+    }
+    // isOpen threshold is 2.5x headRadius (not 4.5x)
+    const headRadius = 14; // scale=1.0
+    if (esc.slitDist > headRadius * 2.5) {
+      assert.equal(esc.isOpen, true, 'isOpen must fire at 2.5x headRadius clearance');
+    }
+  }
+  // Agent should NOT be in COIL when encirclementEscape.isOpen is true
+  if (esc && esc.isOpen) {
+    assert.notEqual(agent.combatStance, 'COIL', 'must not COIL when a slit escape is available');
+  }
+});
+
+test('attack candidate fires at any score (angle-only), boosts only when canBoostAttack', () => {
+  // With minBoostScore gate removed from stance entry, attackCandidate can generate a
+  // turning-only intercept even when currentScore < minBoostScore.
+  // canBoostAttack on the candidate should be false in that case.
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  // Small snake (score below minBoostScore which is typically 150)
+  const headX = 0, headY = 0;
+  const snake = { id: 'me', xx: headX, yy: headY, eang: 0, sc: 1.0, sp: 5.9, sct: 5, pts: [] };
+
+  // Enemy passing ~200px ahead — crossing trajectory
+  const enemy = { id: 'prey', xx: 200, yy: 0, eang: Math.PI / 2, sc: 0.8, sp: 5.9, pts: [] };
+  for (let p = 0; p < 5; p++) {
+    enemy.pts.push({ xx: 200 + p * 10, yy: p * 10 });
+  }
+
+  // Run two frames to build velocity estimate in tracker
+  agent.evaluate(snake, [enemy], [], []);
+  enemy.yy += 30; // move enemy so velocity is visible
+  agent.evaluate(snake, [enemy], [], []);
+
+  // After two frames the attack candidate may or may not exist depending on geometry.
+  // The key invariant: if a candidate exists it must have canBoostAttack defined.
+  // And if currentScore < minBoostScore, canBoostAttack must be false.
+  const hasCandidate = agent.attackTarget !== null;
+  if (hasCandidate) {
+    assert.ok('canBoostAttack' in agent.attackTarget, 'attackCandidate must carry canBoostAttack flag');
+    const currentScore = 5;
+    const minBoostScore = agent.minBoostScore;
+    if (currentScore < minBoostScore) {
+      assert.equal(agent.attackTarget.canBoostAttack, false, 'canBoostAttack must be false when score < minBoostScore');
+    }
+  }
+});

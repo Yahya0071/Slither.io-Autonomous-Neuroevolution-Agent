@@ -231,7 +231,7 @@
     <!-- Embedded Scripts to support direct local file opening (file://) without CORS restrictions -->
   <script type="text/plain" id="codeConsole">/**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -257,7 +257,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -1329,13 +1329,13 @@
           }
 
           // Third-Party Outer Threat: a larger predator roaming in the perimeter
-          if (distHead < 420 && otherScale >= scale * 1.15) {
+          if (distHead < 550 && otherScale >= scale * 1.15) {
             outerPredatorNearby = true;
           }
 
           // Slipstream Detection (v5.9.0):
           // When an enemy is boosting ahead of us within a forward cone, flag their exhaust wake for drafting
-          if (otherSpeed > 7.0 && distHead > 70 && distHead < 520) {
+          if (otherSpeed > 7.0 && distHead > 70 && distHead < 650) {
             let relBearing = Math.atan2(dyHead, dxHead) - currentAng;
             while (relBearing > Math.PI) relBearing -= Math.PI * 2;
             while (relBearing < -Math.PI) relBearing += Math.PI * 2;
@@ -1384,8 +1384,8 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 420 units
-          if (distHead < 420) {
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.2: expanded from 420)
+          if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
             const evx = vx !== 0 ? vx : Math.cos(otherAng) * enemySpeedSec;
@@ -1416,11 +1416,12 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            if (currentScore >= this.minBoostScore && this.boostFuel > 0.35 && distHead >= 80 && distHead <= 380) {
+            // v5.10.2: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
                 const relSpeed = Math.hypot(evx - (cosHead * mySpeed * 60), evy - (sinHead * mySpeed * 60));
-                const leadSec = Math.max(0.25, Math.min(0.60, distHead / (relSpeed + 1e-3)));
+                const leadSec = Math.max(0.25, Math.min(0.65, distHead / (relSpeed + 1e-3)));
 
                 // Constant Turn-Rate & Acceleration (CTRA) Curvilinear Projection:
                 // If enemy is curving (|omega| > 0.20 rad/s), project along circular flight arc rather than linear tangent
@@ -1447,7 +1448,9 @@
                 const sprintSpeedSec = mySpeed * 1.85 * 60;
                 const timeToIntercept = distToIntercept / sprintSpeedSec;
 
-                if (timeToIntercept <= leadSec + 0.30 && distToIntercept < 440) {
+                if (timeToIntercept <= leadSec + 0.35 && distToIntercept < 560) {
+                  // Score weighs smaller-enemy advantage. canBoostAttack only if fuel & score allow.
+                  const canBoostAttack = currentScore >= this.minBoostScore && this.boostFuel > 0.20;
                   const attackScore = ((scale / enemyScale) * 120) / (distToIntercept + 40);
                   if (attackScore > bestAttackScore) {
                     bestAttackScore = attackScore;
@@ -1457,7 +1460,8 @@
                       interceptY,
                       distToIntercept,
                       side: relBearing >= 0 ? 1 : -1,
-                      score: attackScore
+                      score: attackScore,
+                      canBoostAttack
                     };
                   }
                 }
@@ -1466,7 +1470,8 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 380 && Math.abs(relBearing) >= 0.65) {
+            // v5.10.2: Extended range to 480 for earlier constriction setup
+            if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
               // Target must be substantially smaller so our body length can safely close the loop
@@ -1776,10 +1781,12 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.9.0):
-      // When a larger enemy wraps around >= 7 of our 16 rays, find the widest open exit gap
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.2):
+      // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
+      // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
+      // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
       let encirclementEscape = null;
-      if (encirclingThreatRays >= 7) {
+      if (encirclingThreatRays >= 5) {
         let maxSlitClearance = 0;
         let bestSlitAngle = currentAng;
         for (let r = 0; r < this.rayCount; r++) {
@@ -1793,7 +1800,10 @@
           threatRays: encirclingThreatRays,
           slitDist: maxSlitClearance,
           slitAngle: bestSlitAngle,
-          isOpen: maxSlitClearance > headRadius * 4.5
+          // isOpen: gap wide enough to physically squeeze through
+          isOpen: maxSlitClearance > headRadius * 2.5,
+          // isEarly: detected before loop is fully closed (5-6 rays), still time to pre-orient
+          isEarly: encirclingThreatRays < 7
         };
       }
 
@@ -2138,13 +2148,19 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.9.0):
-      // When large enough and surrounded by multiple close threats or pinched on both flanks
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.2):
+      // Detect encirclement early (5 rays) and always prefer slit breach over COIL when a gap exists.
+      // Even a narrow gap (isOpen with 2.5× threshold) should be forced: dying trying is better than
+      // waiting in COIL until the loop closes fully.
       const canCoil = currentScore >= 300 || scale >= 1.15;
       const pinched = inputs[29] > 0.65 && inputs[30] > 0.65;
       const surrounded = dangerUrgency >= 0.55 && inputs[31] >= 0.33; // >=2 nearby enemies
       if (encirclementEscape && encirclementEscape.isOpen) {
-        // Encirclement detected, but an open exit gap exists: VETO COIL and execute Slit Breach!
+        // Encirclement detected (5+ rays), open exit gap exists: VETO COIL and execute Slit Breach!
+        stance = 'DEFEND';
+      } else if (encirclementEscape && encirclementEscape.isEarly && !encirclementEscape.isOpen) {
+        // Early-warning encirclement (5-6 rays) but no clear gap yet:
+        // Enter DEFEND to orient toward widest clearance and avoid COIL lock-in
         stance = 'DEFEND';
       } else if (canCoil && (pinched || surrounded)) {
         stance = 'COIL';
@@ -2159,8 +2175,10 @@
         stance = 'CONSTRICT';
       }
       // 4. ATTACK STANCE: Lead intercept predator strike (from dzaczek/slbot)
-      // Never attempt head-on strike against behemoth threats (massRatio <= 1.5)
-      else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3 && currentScore >= this.minBoostScore && this.boostFuel > 0.35 && this.boostCooldown <= 0) {
+      // v5.10.2: Removed minBoostScore gate from stance entry — angle-only intercept works at any size.
+      //          canBoostAttack flag on candidate governs whether we sprint (requires fuel + score).
+      //          Never attempt head-on strike against behemoth threats (massRatio > 1.5)
+      else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3) {
         stance = 'ATTACK';
       }
       // 5. VACUUM STANCE: Post-kill corpse loot gathering
@@ -2188,18 +2206,33 @@
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.9.0):
+            // Anti-Encirclement Slit Breaching (v5.10.2: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
-            this.flightRecorder.logIncident('SLIT_BREACH_ESCAPE', {
+            const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
+            this.flightRecorder.logIncident(breachTag, {
               t: this.survivalTime,
               x: snake.xx,
               y: snake.yy,
-              info: `Slit angle: ${encirclementEscape.slitAngle.toFixed(2)}`
+              info: `Rays: ${encirclementEscape.threatRays} | Slit angle: ${encirclementEscape.slitAngle.toFixed(2)} | Dist: ${encirclementEscape.slitDist.toFixed(0)}`
             });
             let slitError = encirclementEscape.slitAngle - currentAng;
             while (slitError > Math.PI) slitError -= Math.PI * 2;
             while (slitError < -Math.PI) slitError += Math.PI * 2;
             turnDelta = Math.max(-1, Math.min(1, slitError / 1.25));
+          } else if (encirclementEscape && encirclementEscape.isEarly) {
+            // Early-warning encirclement (5-6 rays, no clear slit yet):
+            // Pre-orient toward widest open clearance ray to set up breach angle before gap closes
+            this.flightRecorder.logIncident('ENCIRCLEMENT_DETECTED', {
+              t: this.survivalTime,
+              x: snake.xx,
+              y: snake.yy,
+              info: `Rays: ${encirclementEscape.threatRays} | Best clearance: ${encirclementEscape.slitDist.toFixed(0)}`
+            });
+            let slitError = encirclementEscape.slitAngle - currentAng;
+            while (slitError > Math.PI) slitError -= Math.PI * 2;
+            while (slitError < -Math.PI) slitError += Math.PI * 2;
+            // Gentle pre-orientation (not a full hard steer — just angle setup)
+            turnDelta = Math.max(-1, Math.min(1, slitError / 1.65));
           } else if (wallDanger) {
             // Emergency bank away from death wall toward arena center
             turnDelta = diffCenterAngle > 0 ? 1.0 : -1.0;
@@ -2329,11 +2362,18 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.9.0):
+          // Emergency Slit Breach Sprint (v5.10.2: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
-          shouldBoost = Math.abs(slitError) < 0.48 && healthyLength && this.boostFuel > 0.15 && this.boostCooldown <= 0;
+          // Boost even without perfect alignment — just pointed roughly toward the exit
+          shouldBoost = Math.abs(slitError) < 0.75 && this.boostFuel > 0.10 && this.boostCooldown <= 0;
+        } else if (encirclementEscape && encirclementEscape.isEarly) {
+          // Early-warning pre-breach: small fuel boost to reposition before slit narrows further
+          let slitError = encirclementEscape.slitAngle - currentAng;
+          while (slitError > Math.PI) slitError -= Math.PI * 2;
+          while (slitError < -Math.PI) slitError += Math.PI * 2;
+          shouldBoost = Math.abs(slitError) < 0.55 && this.boostFuel > 0.20 && this.boostCooldown <= 0;
         }
         // 1. Direct cut-offs, wall danger, or massive behemoth proximity -> BRAKE so enemy cuts past harmlessly ahead
         else if (wallDanger || (cutOffThreat && cutOffThreat.threatScore > 0.75) || (massRatio > 1.5 && dangerUrgency >= 0.4)) {
@@ -2347,8 +2387,8 @@
           shouldBoost = false;
         }
       } else if (stance === 'ATTACK') {
-        // Strike sprint: accelerate across the enemy nose if stamina available
-        shouldBoost = inputs[8] < 0.65 && this.boostCooldown <= 0 && this.boostFuel > 0.25;
+        // Strike sprint: only if candidate has fuel+score clearance (canBoostAttack flag)
+        shouldBoost = Boolean(attackCandidate && attackCandidate.canBoostAttack) && inputs[8] < 0.65 && this.boostCooldown <= 0 && this.boostFuel > 0.20;
       } else if (stance === 'CONSTRICT') {
         // Gapless Constriction (Pro Tournament Rule):
         // Never boost during coiling. Cruising speed keeps body segments tightly spaced
@@ -3903,13 +3943,13 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();</script>
 
   <script type="text/plain" id="codeUserscript">// ==UserScript==
 // @name         Slither.io Autonomous Machine Learning Agent (SlitherML)
 // @namespace    https://slither.io/
-// @version      5.10.1
+// @version      5.10.2
 // @description  32-input Hybrid Neuroevolution + Online Imitation Learning AI for Slither.io. 16 proximity rays, 8 food sectors, self-collision detection, trajectory prediction, and teacher-mode backpropagation whose lessons must win an autonomous 3-life evaluation before being saved.
 // @author       DeepMind Antigravity AI
 // @match        *://slither.io/*
@@ -3923,7 +3963,7 @@
 
 /**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -3949,7 +3989,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -5021,13 +5061,13 @@
           }
 
           // Third-Party Outer Threat: a larger predator roaming in the perimeter
-          if (distHead < 420 && otherScale >= scale * 1.15) {
+          if (distHead < 550 && otherScale >= scale * 1.15) {
             outerPredatorNearby = true;
           }
 
           // Slipstream Detection (v5.9.0):
           // When an enemy is boosting ahead of us within a forward cone, flag their exhaust wake for drafting
-          if (otherSpeed > 7.0 && distHead > 70 && distHead < 520) {
+          if (otherSpeed > 7.0 && distHead > 70 && distHead < 650) {
             let relBearing = Math.atan2(dyHead, dxHead) - currentAng;
             while (relBearing > Math.PI) relBearing -= Math.PI * 2;
             while (relBearing < -Math.PI) relBearing += Math.PI * 2;
@@ -5076,8 +5116,8 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 420 units
-          if (distHead < 420) {
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.2: expanded from 420)
+          if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
             const evx = vx !== 0 ? vx : Math.cos(otherAng) * enemySpeedSec;
@@ -5108,11 +5148,12 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            if (currentScore >= this.minBoostScore && this.boostFuel > 0.35 && distHead >= 80 && distHead <= 380) {
+            // v5.10.2: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
                 const relSpeed = Math.hypot(evx - (cosHead * mySpeed * 60), evy - (sinHead * mySpeed * 60));
-                const leadSec = Math.max(0.25, Math.min(0.60, distHead / (relSpeed + 1e-3)));
+                const leadSec = Math.max(0.25, Math.min(0.65, distHead / (relSpeed + 1e-3)));
 
                 // Constant Turn-Rate & Acceleration (CTRA) Curvilinear Projection:
                 // If enemy is curving (|omega| > 0.20 rad/s), project along circular flight arc rather than linear tangent
@@ -5139,7 +5180,9 @@
                 const sprintSpeedSec = mySpeed * 1.85 * 60;
                 const timeToIntercept = distToIntercept / sprintSpeedSec;
 
-                if (timeToIntercept <= leadSec + 0.30 && distToIntercept < 440) {
+                if (timeToIntercept <= leadSec + 0.35 && distToIntercept < 560) {
+                  // Score weighs smaller-enemy advantage. canBoostAttack only if fuel & score allow.
+                  const canBoostAttack = currentScore >= this.minBoostScore && this.boostFuel > 0.20;
                   const attackScore = ((scale / enemyScale) * 120) / (distToIntercept + 40);
                   if (attackScore > bestAttackScore) {
                     bestAttackScore = attackScore;
@@ -5149,7 +5192,8 @@
                       interceptY,
                       distToIntercept,
                       side: relBearing >= 0 ? 1 : -1,
-                      score: attackScore
+                      score: attackScore,
+                      canBoostAttack
                     };
                   }
                 }
@@ -5158,7 +5202,8 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 380 && Math.abs(relBearing) >= 0.65) {
+            // v5.10.2: Extended range to 480 for earlier constriction setup
+            if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
               // Target must be substantially smaller so our body length can safely close the loop
@@ -5468,10 +5513,12 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.9.0):
-      // When a larger enemy wraps around >= 7 of our 16 rays, find the widest open exit gap
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.2):
+      // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
+      // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
+      // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
       let encirclementEscape = null;
-      if (encirclingThreatRays >= 7) {
+      if (encirclingThreatRays >= 5) {
         let maxSlitClearance = 0;
         let bestSlitAngle = currentAng;
         for (let r = 0; r < this.rayCount; r++) {
@@ -5485,7 +5532,10 @@
           threatRays: encirclingThreatRays,
           slitDist: maxSlitClearance,
           slitAngle: bestSlitAngle,
-          isOpen: maxSlitClearance > headRadius * 4.5
+          // isOpen: gap wide enough to physically squeeze through
+          isOpen: maxSlitClearance > headRadius * 2.5,
+          // isEarly: detected before loop is fully closed (5-6 rays), still time to pre-orient
+          isEarly: encirclingThreatRays < 7
         };
       }
 
@@ -5830,13 +5880,19 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.9.0):
-      // When large enough and surrounded by multiple close threats or pinched on both flanks
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.2):
+      // Detect encirclement early (5 rays) and always prefer slit breach over COIL when a gap exists.
+      // Even a narrow gap (isOpen with 2.5× threshold) should be forced: dying trying is better than
+      // waiting in COIL until the loop closes fully.
       const canCoil = currentScore >= 300 || scale >= 1.15;
       const pinched = inputs[29] > 0.65 && inputs[30] > 0.65;
       const surrounded = dangerUrgency >= 0.55 && inputs[31] >= 0.33; // >=2 nearby enemies
       if (encirclementEscape && encirclementEscape.isOpen) {
-        // Encirclement detected, but an open exit gap exists: VETO COIL and execute Slit Breach!
+        // Encirclement detected (5+ rays), open exit gap exists: VETO COIL and execute Slit Breach!
+        stance = 'DEFEND';
+      } else if (encirclementEscape && encirclementEscape.isEarly && !encirclementEscape.isOpen) {
+        // Early-warning encirclement (5-6 rays) but no clear gap yet:
+        // Enter DEFEND to orient toward widest clearance and avoid COIL lock-in
         stance = 'DEFEND';
       } else if (canCoil && (pinched || surrounded)) {
         stance = 'COIL';
@@ -5851,8 +5907,10 @@
         stance = 'CONSTRICT';
       }
       // 4. ATTACK STANCE: Lead intercept predator strike (from dzaczek/slbot)
-      // Never attempt head-on strike against behemoth threats (massRatio <= 1.5)
-      else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3 && currentScore >= this.minBoostScore && this.boostFuel > 0.35 && this.boostCooldown <= 0) {
+      // v5.10.2: Removed minBoostScore gate from stance entry — angle-only intercept works at any size.
+      //          canBoostAttack flag on candidate governs whether we sprint (requires fuel + score).
+      //          Never attempt head-on strike against behemoth threats (massRatio > 1.5)
+      else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3) {
         stance = 'ATTACK';
       }
       // 5. VACUUM STANCE: Post-kill corpse loot gathering
@@ -5880,18 +5938,33 @@
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.9.0):
+            // Anti-Encirclement Slit Breaching (v5.10.2: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
-            this.flightRecorder.logIncident('SLIT_BREACH_ESCAPE', {
+            const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
+            this.flightRecorder.logIncident(breachTag, {
               t: this.survivalTime,
               x: snake.xx,
               y: snake.yy,
-              info: `Slit angle: ${encirclementEscape.slitAngle.toFixed(2)}`
+              info: `Rays: ${encirclementEscape.threatRays} | Slit angle: ${encirclementEscape.slitAngle.toFixed(2)} | Dist: ${encirclementEscape.slitDist.toFixed(0)}`
             });
             let slitError = encirclementEscape.slitAngle - currentAng;
             while (slitError > Math.PI) slitError -= Math.PI * 2;
             while (slitError < -Math.PI) slitError += Math.PI * 2;
             turnDelta = Math.max(-1, Math.min(1, slitError / 1.25));
+          } else if (encirclementEscape && encirclementEscape.isEarly) {
+            // Early-warning encirclement (5-6 rays, no clear slit yet):
+            // Pre-orient toward widest open clearance ray to set up breach angle before gap closes
+            this.flightRecorder.logIncident('ENCIRCLEMENT_DETECTED', {
+              t: this.survivalTime,
+              x: snake.xx,
+              y: snake.yy,
+              info: `Rays: ${encirclementEscape.threatRays} | Best clearance: ${encirclementEscape.slitDist.toFixed(0)}`
+            });
+            let slitError = encirclementEscape.slitAngle - currentAng;
+            while (slitError > Math.PI) slitError -= Math.PI * 2;
+            while (slitError < -Math.PI) slitError += Math.PI * 2;
+            // Gentle pre-orientation (not a full hard steer — just angle setup)
+            turnDelta = Math.max(-1, Math.min(1, slitError / 1.65));
           } else if (wallDanger) {
             // Emergency bank away from death wall toward arena center
             turnDelta = diffCenterAngle > 0 ? 1.0 : -1.0;
@@ -6021,11 +6094,18 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.9.0):
+          // Emergency Slit Breach Sprint (v5.10.2: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
-          shouldBoost = Math.abs(slitError) < 0.48 && healthyLength && this.boostFuel > 0.15 && this.boostCooldown <= 0;
+          // Boost even without perfect alignment — just pointed roughly toward the exit
+          shouldBoost = Math.abs(slitError) < 0.75 && this.boostFuel > 0.10 && this.boostCooldown <= 0;
+        } else if (encirclementEscape && encirclementEscape.isEarly) {
+          // Early-warning pre-breach: small fuel boost to reposition before slit narrows further
+          let slitError = encirclementEscape.slitAngle - currentAng;
+          while (slitError > Math.PI) slitError -= Math.PI * 2;
+          while (slitError < -Math.PI) slitError += Math.PI * 2;
+          shouldBoost = Math.abs(slitError) < 0.55 && this.boostFuel > 0.20 && this.boostCooldown <= 0;
         }
         // 1. Direct cut-offs, wall danger, or massive behemoth proximity -> BRAKE so enemy cuts past harmlessly ahead
         else if (wallDanger || (cutOffThreat && cutOffThreat.threatScore > 0.75) || (massRatio > 1.5 && dangerUrgency >= 0.4)) {
@@ -6039,8 +6119,8 @@
           shouldBoost = false;
         }
       } else if (stance === 'ATTACK') {
-        // Strike sprint: accelerate across the enemy nose if stamina available
-        shouldBoost = inputs[8] < 0.65 && this.boostCooldown <= 0 && this.boostFuel > 0.25;
+        // Strike sprint: only if candidate has fuel+score clearance (canBoostAttack flag)
+        shouldBoost = Boolean(attackCandidate && attackCandidate.canBoostAttack) && inputs[8] < 0.65 && this.boostCooldown <= 0 && this.boostFuel > 0.20;
       } else if (stance === 'CONSTRICT') {
         // Gapless Constriction (Pro Tournament Rule):
         // Never boost during coiling. Cruising speed keeps body segments tightly spaced
@@ -7595,7 +7675,7 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.1 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();</script>
 
   <script>
