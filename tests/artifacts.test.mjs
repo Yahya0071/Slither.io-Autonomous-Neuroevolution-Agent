@@ -18,6 +18,9 @@ test('console_inject.js is the single source of truth and can be inlined', () =>
   assert.ok(existsSync(sourcePath));
   assert.ok(sourceCode.length > 1000);
   assert.ok(!sourceCode.includes('</script>'), 'a literal </script> would break HTML inlining');
+  assert.doesNotThrow(() => {
+    new Function(sourceCode);
+  }, 'console_inject.js must parse with zero syntax errors');
 });
 
 test('extension/agent.js is byte-identical to the source', () => {

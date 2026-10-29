@@ -286,3 +286,4 @@ test('SlitherMLAgent evaluate updates flightRecorder and onDeath generates autop
   assert.ok(agent.flightRecorder.lastDeathAutopsy);
   assert.equal(agent.flightRecorder.recentEpisodes.length, 1);
 });
+
