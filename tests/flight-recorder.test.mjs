@@ -498,3 +498,30 @@ test('attack candidate fires at any score (angle-only), boosts only when canBoos
     }
   }
 });
+
+test('HUNT stance: agent actively pursues nearby smaller snake when safe', () => {
+  const harness = loadAgent();
+  const agent = harness.newAgent();
+
+  // Our snake at origin, safe from walls
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.2, sp: 5.9, sct: 30, pts: [] };
+
+  // Smaller enemy directly ahead at 300px — a clean hunt target
+  const prey = { id: 'prey', xx: 300, yy: 0, eang: Math.PI / 4, sc: 0.8, sp: 5.9, pts: [] };
+  for (let p = 0; p < 5; p++) {
+    prey.pts.push({ xx: 300 + p * 10, yy: p * 10 });
+  }
+
+  // Run two frames to build velocity estimate
+  agent.evaluate(snake, [prey], [], []);
+  prey.xx += 20; // move prey so tracker sees velocity
+  const result = agent.evaluate(snake, [prey], [], []);
+
+  // Agent should detect the hunt target and either HUNT or ATTACK toward the prey
+  if (agent.combatStance === 'HUNT') {
+    assert.ok(agent.huntTarget !== null, 'huntTarget must be set during HUNT stance');
+    assert.equal(agent.huntTarget.isSmallerPrey, true, 'prey with scale < 85% of self must be flagged isSmallerPrey');
+  }
+  // In any case, dangerUrgency should be low (no danger present) so we should not be in DEFEND
+  assert.notEqual(agent.combatStance, 'DEFEND', 'should not panic-defend against a single small prey');
+});

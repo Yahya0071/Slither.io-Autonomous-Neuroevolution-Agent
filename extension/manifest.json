@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Slither.io Machine Learning Agent",
-  "version": "5.10.2",
+  "version": "5.10.3",
   "description": "Deep Neural Network & Evolutionary Reinforcement Learning Agent for the real Slither.io game with real-time HUD telemetry and raycasting.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [

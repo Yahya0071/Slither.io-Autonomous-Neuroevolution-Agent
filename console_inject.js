@@ -1,6 +1,6 @@
 /**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -26,7 +26,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -668,6 +668,9 @@
       this.cutOffThreat = null;
       this.constrictTarget = null;
       this.constrictDuration = 0;
+      this.huntTarget = null;             // active prey being chased in HUNT stance
+      this.huntDuration = 0;             // seconds continuously hunting same target
+      this.aggressionScore = 0;          // rolling aggression reward (enemy pressure)
       this.coilSign = 0;
       this.lastKillEpicenter = null;
       this.vacuumActiveUntil = 0;
@@ -1066,6 +1069,7 @@
       let bestAttackScore = -1;
       let constrictCandidate = null;
       let bestConstrictScore = -1;
+      let huntCandidate = null;
       let nearestThreatDist = Infinity;
       let nearestThreatScale = scale;
       let nearestThreatSpeed = 5.9;
@@ -1153,7 +1157,7 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 550 units (v5.10.2: expanded from 420)
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.3: expanded from 420)
           if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
@@ -1185,7 +1189,7 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            // v5.10.2: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            // v5.10.3: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
             if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
@@ -1239,7 +1243,7 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            // v5.10.2: Extended range to 480 for earlier constriction setup
+            // v5.10.3: Extended range to 480 for earlier constriction setup
             if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
@@ -1257,6 +1261,23 @@
                     side: relBearing >= 0 ? 1 : -1
                   };
                 }
+              }
+            }
+            // D. HUNT CANDIDATE: Actively chase nearby snakes to pressure them (any size within range)
+            // The snake should always be oriented toward enemies — even without a clean intercept geometry.
+            if (!huntCandidate || distHead < huntCandidate.dist) {
+              const enemyScale = other.sc || 1.0;
+              // Only chase snakes that aren't bigger than 2x our size (else it's a death run)
+              if (enemyScale <= scale * 2.0 && distHead < 700) {
+                huntCandidate = {
+                  enemyId: id,
+                  enemyX: other.xx,
+                  enemyY: other.yy,
+                  enemyScale,
+                  dist: distHead,
+                  enemyAng: otherAng,
+                  isSmallerPrey: enemyScale < scale * 0.85
+                };
               }
             }
           }
@@ -1550,7 +1571,7 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.2):
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.3):
       // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
       // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
       // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
@@ -1760,7 +1781,8 @@
         frontThreatSpeed,
         nearestThreatSpeed,
         encirclementEscape,
-        slipstreamTarget
+        slipstreamTarget,
+        huntCandidate
       };
     }
 
@@ -1856,7 +1878,8 @@
         frontThreatSpeed = 5.9,
         nearestThreatSpeed = 5.9,
         encirclementEscape = null,
-        slipstreamTarget = null
+        slipstreamTarget = null,
+        huntCandidate = null
       } = state;
 
       this.closestObstacleType = closestObstacleType;
@@ -1917,7 +1940,7 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.2):
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.3):
       // Detect encirclement early (5 rays) and always prefer slit breach over COIL when a gap exists.
       // Even a narrow gap (isOpen with 2.5× threshold) should be forced: dying trying is better than
       // waiting in COIL until the loop closes fully.
@@ -1944,7 +1967,7 @@
         stance = 'CONSTRICT';
       }
       // 4. ATTACK STANCE: Lead intercept predator strike (from dzaczek/slbot)
-      // v5.10.2: Removed minBoostScore gate from stance entry — angle-only intercept works at any size.
+      // v5.10.3: Removed minBoostScore gate from stance entry — angle-only intercept works at any size.
       //          canBoostAttack flag on candidate governs whether we sprint (requires fuel + score).
       //          Never attempt head-on strike against behemoth threats (massRatio > 1.5)
       else if (attackCandidate && massRatio <= 1.5 && inputs[8] < 0.65 && dangerUrgency < 0.3) {
@@ -1954,11 +1977,19 @@
       else if (this.lastKillEpicenter && now < this.vacuumActiveUntil && dangerUrgency < 0.3) {
         stance = 'VACUUM';
       }
+      // 6. HUNT STANCE: Actively pursue nearby snakes to pressure/kill them.
+      // Only when safe (dangerUrgency low) and there's a valid target.
+      // Smaller prey = high-priority hunt. Larger but reachable = opportunistic pressure.
+      else if (huntCandidate && dangerUrgency < 0.25 && !wallDanger && normWallDist < 0.86) {
+        stance = 'HUNT';
+      }
       this.combatStance = stance;
       this.attackTarget = (stance === 'ATTACK') ? attackCandidate : null;
       this.cutOffThreat = (stance === 'DEFEND') ? cutOffThreat : null;
       this.constrictTarget = (stance === 'CONSTRICT') ? constrictCandidate : null;
       this.constrictDuration = (stance === 'CONSTRICT') ? ((this.constrictDuration || 0) + dt) : 0;
+      this.huntTarget = (stance === 'HUNT') ? huntCandidate : null;
+      this.huntDuration = (stance === 'HUNT') ? ((this.huntDuration || 0) + dt) : 0;
 
       // A. COIL STANCE: The Apex Defensive Fortress (Circle Method)
       if (stance === 'COIL') {
@@ -1975,7 +2006,7 @@
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.10.2: active from 5 rays, clearance lowered):
+            // Anti-Encirclement Slit Breaching (v5.10.3: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
             const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
             this.flightRecorder.logIncident(breachTag, {
@@ -2064,6 +2095,31 @@
           while (orbitError < -Math.PI) orbitError += Math.PI * 2;
           turnDelta = Math.max(-1, Math.min(1, orbitError / 1.25));
         }
+        // F. HUNT STANCE: Active prey chase — steer toward enemy snake to pressure/intercept
+        else if (stance === 'HUNT' && huntCandidate) {
+          this.foodSteerEma *= 0.3; // Suppress food greed while hunting
+          const angleToHunt = Math.atan2(huntCandidate.enemyY - snake.yy, huntCandidate.enemyX - snake.xx);
+          let huntError = angleToHunt - currentAng;
+          while (huntError > Math.PI) huntError -= Math.PI * 2;
+          while (huntError < -Math.PI) huntError += Math.PI * 2;
+
+          // When chasing smaller prey: steer aggressively to cut ahead of their path
+          // When pressure-chasing equal/larger: steer toward them but softer (don't dive in)
+          const huntAggression = huntCandidate.isSmallerPrey ? 0.85 : 0.55;
+          // Lead the target slightly: steer toward where they'll be, not where they are
+          const leadAngle = huntCandidate.enemyAng;
+          let leadError = leadAngle - currentAng;
+          while (leadError > Math.PI) leadError -= Math.PI * 2;
+          while (leadError < -Math.PI) leadError += Math.PI * 2;
+          // Blend: 70% toward enemy position + 30% toward their heading (leads them)
+          const blendedError = huntError * 0.7 + leadError * 0.3;
+          turnDelta = Math.max(-1, Math.min(1, blendedError / 1.4)) * huntAggression + turnDelta * (1 - huntAggression);
+
+          // Apply partial danger urgency blend so we don't dive into walls while hunting
+          if (dangerUrgency > 0.05) {
+            turnDelta = turnDelta * (1 - dangerUrgency * 0.6) + reflexSign * dangerUrgency * 0.6;
+          }
+        }
         // E. VACUUM & FORAGE STANCE: Dual-Tier Food & Corpse Scavenging + Exploratory Sweep
         else {
           const foodTarget = this._pickFoodTarget(currentAng);
@@ -2110,6 +2166,14 @@
         this.fitness = Math.max(0, this.fitness - dt * 15.0 * dangerUrgency);
       }
 
+      // Aggression Proximity Reward: reward the agent for staying near enemy snakes.
+      // This shapes evolution to *want* to be near enemies, not just avoid them.
+      if (stance === 'HUNT' || stance === 'ATTACK' || stance === 'CONSTRICT') {
+        const preyDist = huntCandidate ? huntCandidate.dist : (attackCandidate ? attackCandidate.distToIntercept : 999);
+        const proximityBonus = Math.max(0, (600 - preyDist) / 600) * dt * 8.0;
+        this.fitness += proximityBonus;
+      }
+
       // Smooth steering to prevent high-frequency jitter/head shaking (JuiHsiu/Slither-DRL filter)
       const smoothedTurn = turnDelta * 0.7 + this.prevTurnEma * 0.3;
       this.prevTurnEma = this.prevTurnEma * 0.82 + turnDelta * 0.18;
@@ -2131,7 +2195,7 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.10.2: wider alignment cone 0.75 rad, lower fuel 0.10):
+          // Emergency Slit Breach Sprint (v5.10.3: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
@@ -2168,6 +2232,16 @@
         const foodTarget = this._pickFoodTarget(currentAng);
         shouldBoost = forwardClear && healthyLength && Boolean(foodTarget) && foodTarget.dist < 400 &&
                       this.boostFuel > 0.20 && this.boostCooldown <= 0;
+      } else if (stance === 'HUNT') {
+        // Sprint to catch fleeing prey when aligned, no danger ahead, and fuel available
+        const isSmallPrey = huntCandidate && huntCandidate.isSmallerPrey;
+        const huntAngle = huntCandidate ? Math.atan2(huntCandidate.enemyY - snake.yy, huntCandidate.enemyX - snake.xx) : currentAng;
+        let huntAlignError = huntAngle - currentAng;
+        while (huntAlignError > Math.PI) huntAlignError -= Math.PI * 2;
+        while (huntAlignError < -Math.PI) huntAlignError += Math.PI * 2;
+        const wellAligned = Math.abs(huntAlignError) < 0.55;
+        shouldBoost = isSmallPrey && wellAligned && forwardClear && healthyLength &&
+                      this.boostFuel > 0.30 && this.boostCooldown <= 0;
       } else {
         // Foraging sprint: Mass-ROI governed sprint (from JuiHsiu/Slither-DRL)
         const foodTarget = this._pickFoodTarget(currentAng);
@@ -2278,7 +2352,8 @@
         frontThreatSpeed,
         nearestThreatSpeed,
         encirclementEscape,
-        slipstreamTarget
+        slipstreamTarget,
+        huntCandidate
       };
     }
 
@@ -3712,5 +3787,5 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.2 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.3 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();
