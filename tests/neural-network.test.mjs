@@ -277,3 +277,12 @@ test('mutate scales perturbation by Xavier fan-in and produces valid bounded wei
   const l0Energy = net.weights[0].reduce((s, v) => s + v * v, 0) / net.weights[0].length;
   assert.ok(l0Energy > 0.01, 'mutation produces valid non-zero weight energy');
 });
+
+test('mutate clamps output steering bias biases[2][0] within [-0.15, 0.15] even after 500 aggressive mutations', () => {
+  const net = new NeuralNetwork(INPUTS, HIDDEN, OUTPUTS);
+  for (let step = 0; step < 500; step++) {
+    net.mutate(1.0, 0.5); // extreme mutation rate and strength
+    const steerBias = net.biases[2][0];
+    assert.ok(steerBias >= -0.15001 && steerBias <= 0.15001, `steering bias must remain clamped within [-0.15, 0.15], got ${steerBias}`);
+  }
+});

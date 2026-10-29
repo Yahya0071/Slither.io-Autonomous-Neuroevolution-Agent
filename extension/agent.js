@@ -240,9 +240,20 @@
               const u2 = Math.random();
               pert = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2) * layerStrength;
             }
-            b[j] = Math.max(-6.0, Math.min(6.0, b[j] + pert));
+            if (i === this.weights.length - 1 && j === 0) {
+              // Output layer steering bias: heavily damped & clamped within [-0.15, 0.15]
+              // to prevent runaway counter-clockwise or clockwise orbital drift.
+              b[j] = Math.max(-0.15, Math.min(0.15, b[j] + pert * 0.35));
+            } else {
+              b[j] = Math.max(-6.0, Math.min(6.0, b[j] + pert));
+            }
           }
         }
+      }
+      // Guarantee output steering bias remains strictly centered within hydrodynamic bounds [-0.15, 0.15]
+      const lastBiases = this.biases[this.biases.length - 1];
+      if (lastBiases && lastBiases.length > 0) {
+        lastBiases[0] = Math.max(-0.15, Math.min(0.15, lastBiases[0]));
       }
     }
 
@@ -684,6 +695,20 @@
       const active = parsed.activeBrain ? NeuralNetwork.fromJSON(parsed.activeBrain, this.inputCount) : null;
       this.brain = active || champion;
 
+      // Sanitize steering bias on loaded brains to keep within hydrodynamic limits [-0.15, 0.15]
+      if (this.championBrain && this.championBrain.biases && this.championBrain.biases.length > 0) {
+        const champOutB = this.championBrain.biases[this.championBrain.biases.length - 1];
+        if (champOutB && champOutB.length > 0) {
+          champOutB[0] = Math.max(-0.15, Math.min(0.15, champOutB[0]));
+        }
+      }
+      if (this.brain && this.brain.biases && this.brain.biases.length > 0) {
+        const brainOutB = this.brain.biases[this.brain.biases.length - 1];
+        if (brainOutB && brainOutB.length > 0) {
+          brainOutB[0] = Math.max(-0.15, Math.min(0.15, brainOutB[0]));
+        }
+      }
+
       this.bestFitness = typeof parsed.bestFitness === 'number' ? parsed.bestFitness : 0;
       this.allTimePeakFitness = typeof parsed.allTimePeakFitness === 'number'
         ? Math.max(parsed.allTimePeakFitness, this.bestFitness)
@@ -1107,14 +1132,14 @@
                 omega = (prev.omega || 0) * 0.6 + instOmega * 0.4;
               }
 
-              this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx, vy, omega, timestamp: now, wasClose: distHead < 300, dist: distHead });
+              this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx, vy, omega, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
             } else {
               vx = prev.vx;
               vy = prev.vy;
               omega = prev.omega || 0;
             }
           } else {
-            this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead });
+            this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
           // Combat Geometry Evaluation for enemies within 420 units
@@ -1227,16 +1252,23 @@
         if (!activeIds.has(id)) {
           if (record.wasClose && (now - record.timestamp < 1000)) {
             this.kills++;
-            this.fitness += 250.0;
+            // Dynamic Mass-Scaled Combat Kill Bounty:
+            // Slaying equal or larger predators rewards up to +600 fitness,
+            // while eliminating small hatchlings still awards a solid base +250.
+            const victimScale = record.enemyScale || 1.0;
+            const myScale = scale || 1.0;
+            const killRatio = victimScale / Math.max(0.1, myScale);
+            const combatBounty = Math.round(250 + Math.min(350, Math.max(0, (killRatio - 0.75) * 450)));
+            this.fitness += combatBounty;
             this.lastKillEpicenter = { x: record.xx, y: record.yy, timestamp: now };
             this.vacuumActiveUntil = now + 4000;
             this.flightRecorder.logIncident('KILL_CONFIRMED', {
               t: this.survivalTime,
               x: record.xx,
               y: record.yy,
-              info: `Kill #${this.kills} (+250 Bounty)`
+              info: `Kill #${this.kills} (+${combatBounty} Bounty, victim scale ${victimScale.toFixed(2)})`
             });
-            console.log(`%c[SlitherML] 🎯 ENEMY ELIMINATED! Confirmed Kill #${this.kills} (+250 Fitness Bounty). Activating 4s Post-Kill Corpse Vacuum Mode!`, 'color: #ff0055; font-weight: bold;');
+            console.log(`%c[SlitherML] ⚔️ ENEMY ELIMINATED! Confirmed Kill #${this.kills} (+${combatBounty} Fitness Bounty, victim scale ${victimScale.toFixed(2)} vs self ${myScale.toFixed(2)}). Activating 4s Post-Kill Corpse Vacuum Mode!`, 'color: #ff0055; font-weight: bold;');
           }
           this.enemyTracker.delete(id);
         } else if (now - record.timestamp > 2000) {
@@ -2326,6 +2358,13 @@
       // blend 15% weights into the baseBrain breeding seed (championBrain untouched).
       const mutantWorthyOfBlend = isAutonomousMutant && aggregateFitness <= previousBest && aggregateFitness >= previousBest * 0.75;
 
+      // Prodigy Single-Run Rule: An autonomous mutant that achieved a heroic single life
+      // (>= 22,000 points or >= 55% of all-time peak fitness) but missed the 75% aggregate bar
+      // due to bad spawn-luck on remaining runs should NOT have its breakthrough weights discarded.
+      // Blends 20% of its weights into the breeding template.
+      const isProdigyRun = isAutonomousMutant && !mutantWorthyOfBlend && aggregateFitness <= previousBest &&
+        sorted[0] >= Math.min(22000, (this.allTimePeakFitness || previousBest) * 0.55);
+
       // Strict elitism with Consistency Gate:
       if (aggregateFitness > this.bestFitness && passesConsistencyGate) {
         this.stagnantGens = 0;
@@ -2341,16 +2380,19 @@
         // Plateau relief: after 6 consecutive stagnant generations, gently ease bar by 0.5%
         // (accelerating to 1.0% when stagnantGens >= 15) to prevent 1-in-1000 lucky spawn
         // outliers from permanently freezing evolution.
-        // Cap floor at 85% of peak fitness to preserve strict elitism.
+        // Adaptive Plateau Floor: Standard floor is 85% of peak fitness. When deep stagnation persists
+        // (>= 50 gens without a champion), ease to 75%, and at >= 60 gens ease to 70% to prevent
+        // infinite stagnation traps (e.g., Gen 134 at 67 stagnant gens).
         this.allTimePeakFitness = Math.max(this.allTimePeakFitness || 0, this.bestFitness);
-        const minBar = this.allTimePeakFitness * 0.85;
+        const floorRatio = this.stagnantGens >= 60 ? 0.70 : (this.stagnantGens >= 50 ? 0.75 : 0.85);
+        const minBar = this.allTimePeakFitness * floorRatio;
         if (this.stagnantGens >= 15) {
           const decayed = Math.max(minBar, this.bestFitness * 0.990);
-          console.log(`%c[SlitherML] 📉 Deep Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-1.0%${decayed === minBar ? ', capped at 85% floor' : ''})`, 'color: #94a3b8;');
+          console.log(`%c[SlitherML] 📉 Deep Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-1.0%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');
           this.bestFitness = decayed;
         } else if (this.stagnantGens >= 6) {
           const decayed = Math.max(minBar, this.bestFitness * 0.995);
-          console.log(`%c[SlitherML] 📉 Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar gently eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-0.5%${decayed === minBar ? ', capped at 85% floor' : ''})`, 'color: #94a3b8;');
+          console.log(`%c[SlitherML] 📉 Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar gently eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-0.5%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');
           this.bestFitness = decayed;
         }
 
@@ -2370,8 +2412,11 @@
                 chB[j] = (chB[j] * 0.8) + (cB[j] * 0.2);
               }
             }
-            if (this.championBrain.biases[2]) {
-              this.championBrain.biases[2][0] = Math.max(-0.15, Math.min(0.15, this.championBrain.biases[2][0]));
+            if (this.championBrain.biases && this.championBrain.biases.length > 0) {
+              const chOutB = this.championBrain.biases[this.championBrain.biases.length - 1];
+              if (chOutB && chOutB.length > 0) {
+                chOutB[0] = Math.max(-0.15, Math.min(0.15, chOutB[0]));
+              }
             }
             this.stagnantGens = 0;
           } else {
@@ -2389,22 +2434,38 @@
       if (this.championBrain) {
         const baseBrain = NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
         if (baseBrain) {
-          if ((mutantWorthyOfBlend || teacherWorthyOfBreedingBlend) && this.brain) {
-            const blendReason = teacherWorthyOfBreedingBlend
-              ? `Preserving human tuition (${Math.floor(aggregateFitness)} aggregate): Blending 15% teacher candidate weights into mutant breeding template!`
-              : `Autonomous mutant showed breakthrough performance (${Math.floor(aggregateFitness)} aggregate vs champ ${Math.floor(this.bestFitness)}). Blending 15% weights into mutant breeding template!`;
+          if ((mutantWorthyOfBlend || teacherWorthyOfBreedingBlend || isProdigyRun) && this.brain) {
+            let blendRatio = 0.15;
+            let blendReason = '';
+            if (teacherWorthyOfBreedingBlend) {
+              blendRatio = 0.15;
+              blendReason = `Preserving human tuition (${Math.floor(aggregateFitness)} aggregate): Blending 15% teacher candidate weights into mutant breeding template!`;
+            } else if (isProdigyRun) {
+              blendRatio = 0.20;
+              blendReason = `🌟 Prodigy single-run breakthrough (${Math.floor(sorted[0])} peak life, aggregate ${Math.floor(aggregateFitness)} vs champ ${Math.floor(this.bestFitness)}): Blending 20% weights into mutant breeding seed!`;
+            } else {
+              blendRatio = 0.15;
+              blendReason = `Autonomous mutant showed breakthrough performance (${Math.floor(aggregateFitness)} aggregate vs champ ${Math.floor(this.bestFitness)}). Blending 15% weights into mutant breeding template!`;
+            }
             console.log(`%c[SlitherML] 🧬 ${blendReason}`, 'color: #a855f7; font-weight: bold;');
             const candidateBrain = this.brain;
+            const keepRatio = 1.0 - blendRatio;
             for (let layer = 0; layer < baseBrain.weights.length; layer++) {
               const bW = baseBrain.weights[layer];
               const cW = candidateBrain.weights[layer];
               for (let j = 0; j < bW.length; j++) {
-                bW[j] = (bW[j] * 0.85) + (cW[j] * 0.15);
+                bW[j] = (bW[j] * keepRatio) + (cW[j] * blendRatio);
               }
               const bB = baseBrain.biases[layer];
               const cB = candidateBrain.biases[layer];
               for (let j = 0; j < bB.length; j++) {
-                bB[j] = (bB[j] * 0.85) + (cB[j] * 0.15);
+                bB[j] = (bB[j] * keepRatio) + (cB[j] * blendRatio);
+              }
+            }
+            if (baseBrain.biases && baseBrain.biases.length > 0) {
+              const baseOutB = baseBrain.biases[baseBrain.biases.length - 1];
+              if (baseOutB && baseOutB.length > 0) {
+                baseOutB[0] = Math.max(-0.15, Math.min(0.15, baseOutB[0]));
               }
             }
           }

@@ -319,6 +319,29 @@ test('confirmed kill detection: tracks vanished nearby enemy and awards kill bou
   assert.ok(agent.fitness >= initialFit + 150.0, 'must award +150 fitness bounty');
 });
 
+test('dynamic mass-scaled combat bounty: scales bounty between +250 and +600 based on victim-to-self scale ratio', () => {
+  const { agent } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, pts: [] };
+
+  // 1. Small hatchling victim (sc = 0.5 vs 1.0 -> ratio 0.5 < 0.75 -> base bounty +250)
+  const smallEnemy = { id: 'small', xx: 100, yy: 50, eang: 0, sp: 5.9, sc: 0.5, dead: false, pts: [] };
+  agent._extractInputs(snake, [smallEnemy], [], [], 0.0167, 1000);
+  const fitBefore1 = agent.fitness;
+  agent._extractInputs(snake, [], [], [], 0.0167, 1050);
+  const smallBounty = agent.fitness - fitBefore1;
+  assert.equal(agent.kills, 1);
+  assert.equal(Math.round(smallBounty), 250, 'small snake awards base +250 bounty');
+
+  // 2. Behemoth predator victim (sc = 2.0 vs 1.0 -> ratio 2.0 >= 1.53 -> max bounty +600)
+  const giantEnemy = { id: 'giant', xx: 100, yy: 50, eang: 0, sp: 5.9, sc: 2.0, dead: false, pts: [] };
+  agent._extractInputs(snake, [giantEnemy], [], [], 0.0167, 2000);
+  const fitBefore2 = agent.fitness;
+  agent._extractInputs(snake, [], [], [], 0.0167, 2050);
+  const giantBounty = agent.fitness - fitBefore2;
+  assert.equal(agent.kills, 2);
+  assert.equal(Math.round(giantBounty), 600, 'eliminating larger predator awards max +600 bounty');
+});
+
 test('anti-stagnation adaptive mutation: escalates mutation rate after 3 stagnant generations', () => {
   const { agent } = makeAgent(1);
   agent.bestFitness = 5000;

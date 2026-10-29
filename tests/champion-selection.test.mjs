@@ -515,3 +515,59 @@ test('plateau decay is strictly capped from below at 85% of all-time peak fitnes
   // With 85% floor: clamped at exactly 8500
   assert.equal(Math.round(agent.bestFitness), 8500, `bestFitness must be clamped at 85% floor (8500), got ${agent.bestFitness}`);
 });
+
+test('deep stagnation breakthrough: floor adapts to 75% at >= 50 gens and 70% at >= 60 gens', () => {
+  const { agent } = withChampion({ fitness: 10000 });
+  agent.allTimePeakFitness = 10000;
+  agent.stagnantGens = 49;
+  agent.bestFitness = 8500;
+
+  // At gen 50: floor ratio adapts to 0.75 (7,500)
+  rollout(agent, 500);
+  assert.equal(agent.stagnantGens, 50);
+  assert.ok(agent.bestFitness < 8500, `bestFitness should ease below 8500 once stagnantGens >= 50, got ${agent.bestFitness}`);
+
+  // Fast forward to stagnantGens = 59
+  agent.stagnantGens = 59;
+  agent.bestFitness = 7500;
+
+  // At gen 60: floor ratio adapts to 0.70 (7,000)
+  rollout(agent, 500);
+  assert.equal(agent.stagnantGens, 60);
+  assert.ok(agent.bestFitness < 7500, `bestFitness should ease below 7500 once stagnantGens >= 60, got ${agent.bestFitness}`);
+  assert.ok(agent.bestFitness >= 7000, `bestFitness must respect 70% floor, got ${agent.bestFitness}`);
+});
+
+test('prodigy single-run rule: mutant with heroic single life >= 55% of peak fitness blends 20% weights into breeding template', () => {
+  const { agent, NeuralNetwork } = withChampion({ fitness: 50000 });
+  const originalMutate = NeuralNetwork.prototype.mutate;
+  NeuralNetwork.prototype.mutate = () => {}; // freeze mutation to test exact blend math
+  try {
+    agent.championBrain.weights[0].fill(1.0);
+    agent.championBrain.biases[0].fill(1.0);
+    agent.brain.weights[0].fill(2.0);
+    agent.brain.biases[0].fill(2.0);
+
+    // Life 1: 30,000 (heroic life >= 55% of 50,000 = 27,500)
+    // Life 2: 200 (instant spawn-collision)
+    // Life 3: 100
+    // Aggregate = (30000 + 200) / 2 = 15,100 (15,100 / 50,000 = 30.2% < 75% standard blend threshold)
+    // But Life 1 qualifies for Prodigy Single-Run rule!
+    die(agent, { fitness: 30000, survivalTime: 65, human: false });
+    die(agent, { fitness: 200, survivalTime: 8, human: false });
+    die(agent, { fitness: 100, survivalTime: 6, human: false });
+
+    // Champion brain remains completely untouched at 1.0
+    assert.equal(agent.championBrain.weights[0][0], 1.0, 'championBrain must remain untouched');
+    assert.equal(agent.bestFitness, 50000, 'bestFitness must remain untouched');
+
+    // Mutant breeding template received 20% blend: (1.0 * 0.8) + (2.0 * 0.2) = 1.20
+    const expected = (1.0 * 0.80) + (2.0 * 0.20);
+    assert.ok(
+      Math.abs(agent.brain.weights[0][0] - expected) < 1e-5,
+      `prodigy breeding template must be softly blended to ${expected}, got ${agent.brain.weights[0][0]}`
+    );
+  } finally {
+    NeuralNetwork.prototype.mutate = originalMutate;
+  }
+});
