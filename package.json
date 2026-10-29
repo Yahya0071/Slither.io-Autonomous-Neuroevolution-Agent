@@ -1,6 +1,6 @@
 {
     "name":  "slither-ml-agent",
-    "version":  "5.10.4",
+    "version": "5.10.6",
     "description":  "Autonomous Neuroevolution Machine Learning Agent with Forensic Deductor \u0026 Pathfinder for official Slither.io",
     "private":  true,
     "type":  "module",
@@ -20,3 +20,4 @@
                      "reinforcement-learning"
                  ]
 }
+

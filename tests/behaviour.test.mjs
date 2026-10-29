@@ -1241,3 +1241,143 @@ test('contested-loot scavenger caution: vetos boost and offsets away from rival 
   // Must NOT blind-boost into the contested loot
   assert.equal(decision.isBoosting, false, 'must veto boost when rival is contesting the corpse loot');
 });
+
+// ---------------------------------------------------------------------------
+// 11. Directional Evasion Latch & Traffic Corridor Vision (v5.10.5)
+// ---------------------------------------------------------------------------
+test('directional evasion latch: prevents high-frequency sign flipping when clearances fluctuate', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+
+  const signs = [];
+  // Run 6 consecutive frames where left vs right clearance fluctuates slightly (500 vs 505)
+  for (let f = 0; f < 6; f++) {
+    const isEven = f % 2 === 0;
+    agent._extractInputs = () => {
+      const inputs = new Float32Array(32);
+      inputs[8] = 0.8; // front obstacle danger
+      return {
+        inputs,
+        minObstacleDist: 60,
+        frontObstacleDist: 60,
+        frontThreatScale: 1.0,
+        nearestThreatScale: 1.0,
+        leftClearance: isEven ? 510 : 495,
+        rightClearance: isEven ? 495 : 510,
+        forwardObstacleDanger: true,
+        normWallDist: 0.2,
+        diffCenterAngle: 0,
+        headRadius: 14,
+        currentAng: 0,
+        currentScore: 100,
+        cutOffThreat: null,
+        attackCandidate: null,
+        constrictCandidate: null,
+        closestObstacleType: 'body',
+        frontObstacleType: 'body',
+        selfShieldSide: 0,
+        encirclementEscape: null,
+        slipstreamTarget: null,
+        huntCandidate: null,
+        maxCorridorDist: 60,
+        bestCorridorAngle: 0
+      };
+    };
+
+    agent.evaluate(snake, [], [], []);
+    signs.push(agent.evasionSign);
+  }
+
+  // All recorded evasion signs during the 350ms latch window must match the initial sign (no flipping!)
+  assert.equal(signs.length, 6);
+  const initialSign = signs[0];
+  assert.notEqual(initialSign, 0, 'initial evasion sign must be non-zero');
+  for (let i = 1; i < signs.length; i++) {
+    assert.equal(signs[i], initialSign, `frame ${i} evasionSign must stay latched to ${initialSign}, got ${signs[i]}`);
+  }
+});
+
+test('escape corridor vision: steers toward clearest open corridor when surrounded by multiple enemies', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+
+  agent._extractInputs = () => {
+    const inputs = new Float32Array(32);
+    inputs[31] = 0.50; // Multiple enemies roaming around (traffic)
+    inputs[8] = 0.75;  // Obstacle right ahead
+    return {
+      inputs,
+      minObstacleDist: 50,
+      frontObstacleDist: 50,
+      frontThreatScale: 1.0,
+      nearestThreatScale: 1.0,
+      leftClearance: 120,
+      rightClearance: 120,
+      forwardObstacleDanger: true,
+      normWallDist: 0.2,
+      diffCenterAngle: 0,
+      headRadius: 14,
+      currentAng: 0,
+      currentScore: 100,
+      cutOffThreat: null,
+      attackCandidate: null,
+      constrictCandidate: null,
+      closestObstacleType: 'body',
+      frontObstacleType: 'body',
+      selfShieldSide: 0,
+      encirclementEscape: null,
+      slipstreamTarget: null,
+      huntCandidate: null,
+      maxCorridorDist: 480,
+      bestCorridorAngle: Math.PI / 2 // Open corridor is to the left (+90 deg)
+    };
+  };
+
+  const decision = agent.evaluate(snake, [], [], []);
+  assert.equal(decision.stance, 'DEFEND', 'must enter DEFEND stance');
+  assert.ok(decision.targetAngle > 0.5, `must steer toward open left corridor (+angle), got targetAngle: ${decision.targetAngle}`);
+});
+
+test('snake defensive coil: coils at score >= 80 when pinched without exit (v5.10.6)', () => {
+  const { agent, clock } = makeAgent(1);
+  // v5.10.6: canCoil threshold raised to score>=80 (tiny snakes coil into their own body coffin).
+  // Score = 90 — big enough to coil; no open corridor; no slit escape.
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.09, sp: 5.9, sct: 90, pts: [] };
+
+  agent._extractInputs = () => {
+    const inputs = new Float32Array(32);
+    inputs[29] = 0.80; // pinched left
+    inputs[30] = 0.80; // pinched right
+    inputs[31] = 0.60; // surrounded by traffic
+    return {
+      inputs,
+      minObstacleDist: 40,
+      frontObstacleDist: 40,
+      frontThreatScale: 1.2,
+      nearestThreatScale: 1.2,
+      leftClearance: 40,
+      rightClearance: 40,
+      forwardObstacleDanger: true,
+      normWallDist: 0.2,
+      diffCenterAngle: 0,
+      headRadius: 14,
+      currentAng: 0,
+      currentScore: 90,
+      cutOffThreat: null,
+      attackCandidate: null,
+      constrictCandidate: null,
+      closestObstacleType: 'body',
+      frontObstacleType: 'body',
+      selfShieldSide: 0,
+      encirclementEscape: null, // No open exit gap
+      slipstreamTarget: null,
+      huntCandidate: null,
+      maxCorridorDist: 35,       // <= headRadius(14)*3.5=49, no open corridor
+      bestCorridorAngle: 0,
+      encirclingThreatRays: 3    // Below mid-coil pivot threshold (< 4)
+    };
+  };
+
+  const decision = agent.evaluate(snake, [], [], []);
+  assert.equal(decision.stance, 'COIL', 'snake with score 90, scale>=1.08, pinched, no corridor must enter COIL');
+});

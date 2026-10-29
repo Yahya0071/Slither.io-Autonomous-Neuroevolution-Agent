@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.6 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -26,7 +26,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.6 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -702,6 +702,9 @@
       this.selfShieldSide = 0;
       this.encirclementEscape = null;
       this.slipstreamTarget = null;
+      this.evasionSign = 0;              // latched evasion direction (+1 left, -1 right)
+      this.evasionLatchTimer = 0;        // seconds remaining in latched evasion commitment
+      this.escapeCorridorAngle = null;   // angle of clearest exit corridor in traffic
       this.teacherQuarantineBuffer = [];
       this.teacherQuarantineCapacity = 45; // ~0.75s Failure-Trauma Filter
       this.kills = 0;
@@ -960,6 +963,9 @@
       this.constrictTarget = null;
       this.lastKillEpicenter = null;
       this.vacuumActiveUntil = 0;
+      this.evasionSign = 0;
+      this.evasionLatchTimer = 0;
+      this.escapeCorridorAngle = null;
       this.flightRecorder = new FlightRecorder();
       this._seedBaselineWeights();
       console.log('%c[SlitherML] 🔄 Brain reset to Gen 1 Baseline Weights.', 'color: #ffb703; font-weight: bold;');
@@ -1178,7 +1184,7 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 550 units (v5.10.4: expanded from 420)
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.6: expanded from 420)
           if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
@@ -1210,7 +1216,7 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            // v5.10.4: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            // v5.10.6: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
             if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
@@ -1264,7 +1270,7 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            // v5.10.4: Extended range to 480 for earlier constriction setup
+            // v5.10.6: Extended range to 480 for earlier constriction setup
             if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
@@ -1548,8 +1554,10 @@
           }
         }
 
-        // Anti-Encirclement Threat Tracking (v5.9.0):
-        if ((hitType === 'body' || hitType === 'head') && hitScale >= scale * 1.15 && closestDist < sensorRange * 0.85) {
+        // Anti-Encirclement Threat Tracking (v5.10.6):
+        // Count ANY surrounding enemy body/head regardless of size - even same-size snakes
+        // wrapping us must be detected to trigger slit-breach escape before COIL lock-in.
+        if ((hitType === 'body' || hitType === 'head') && closestDist < sensorRange * 0.85) {
           encirclingThreatRays++;
         }
 
@@ -1592,7 +1600,7 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.4):
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.6):
       // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
       // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
       // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
@@ -1616,6 +1624,18 @@
           // isEarly: detected before loop is fully closed (5-6 rays), still time to pre-orient
           isEarly: encirclingThreatRays < 7
         };
+      }
+
+      // Multi-Snake Escape Corridor Finder ("Vision" in Traffic v5.10.6):
+      // Locates the cleanest continuous gap across all 16 rays to navigate through mosh pits
+      let maxCorridorDist = 0;
+      let bestCorridorAngle = currentAng;
+      for (let r = 0; r < this.rayCount; r++) {
+        const ray = this.activeRays[r];
+        if (ray && ray.hitType !== 'wall' && ray.dist > maxCorridorDist) {
+          maxCorridorDist = ray.dist;
+          bestCorridorAngle = ray.angle;
+        }
       }
 
       // 3. 8-Sector Food Radar & Debris/Prey Perception
@@ -1810,12 +1830,15 @@
         encirclementEscape,
         slipstreamTarget,
         huntCandidate,
-        corpsePelletCount
+        corpsePelletCount,
+        maxCorridorDist,
+        bestCorridorAngle,
+        encirclingThreatRays
       };
     }
 
     // Pick the pellet worth steering at: close, valuable, and cheap to reach.
-    // Enhanced with Corpse Cluster Gravity, Kill-Epicenter Lock & Rival Scavenger Repulsion (v5.10.4)
+    // Enhanced with Corpse Cluster Gravity, Kill-Epicenter Lock & Rival Scavenger Repulsion (v5.10.6)
     _pickFoodTarget(currentAng, headX = 0, headY = 0, snakes = null) {
       const list = this.detectedFoods;
       if (!list || list.length === 0) return null;
@@ -2004,7 +2027,10 @@
         encirclementEscape = null,
         slipstreamTarget = null,
         huntCandidate = null,
-        corpsePelletCount = 0
+        corpsePelletCount = 0,
+        maxCorridorDist = 520,
+        bestCorridorAngle = currentAng,
+        encirclingThreatRays = 0
       } = state;
 
       // Pre-compute primary food target once for Stance Arbiter, Steering, and Boost Governor
@@ -2057,7 +2083,29 @@
       else if (frontObstacleType === 'head' && dangerUrgency > 0.05) {
         dangerUrgency = Math.min(1.0, dangerUrgency * 1.35);
       }
-      const reflexSign = leftClearance >= rightClearance ? 1 : -1;
+      // Directional Evasion Latch with Hysteresis (v5.10.6):
+      // Prevents 60 FPS bang-bang left-right head shaking when surrounded by snakes.
+      this.evasionLatchTimer = Math.max(0, (this.evasionLatchTimer || 0) - dt);
+      const rawSign = leftClearance >= rightClearance ? 1 : -1;
+      const clearanceDiff = Math.abs(leftClearance - rightClearance);
+      const totalClearance = Math.max(1, leftClearance + rightClearance);
+      // Decisive 25%+ advantage required to flip an active latched turn direction
+      const decisiveAdvantage = (clearanceDiff / totalClearance) > 0.25;
+
+      let reflexSign = rawSign;
+      if (dangerUrgency > 0.08 || this.cutOffThreat || normWallDist > 0.88) {
+        if (!this.evasionSign || this.evasionLatchTimer <= 0) {
+          this.evasionSign = rawSign;
+          this.evasionLatchTimer = 0.35; // Latch evasion direction for at least 350ms
+        } else if (rawSign !== this.evasionSign && decisiveAdvantage && this.evasionLatchTimer < 0.20) {
+          this.evasionSign = rawSign;
+          this.evasionLatchTimer = 0.35;
+        }
+        reflexSign = this.evasionSign;
+      } else {
+        this.evasionSign = 0;
+        this.evasionLatchTimer = 0;
+      }
 
       const forwardClear = inputs[7] < 0.35 && inputs[8] < 0.35 && inputs[9] < 0.35;
       const healthyLength = currentScore >= this.minBoostScore &&
@@ -2069,11 +2117,11 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.4):
-      // Detect encirclement early (5 rays) and always prefer slit breach over COIL when a gap exists.
-      // Even a narrow gap (isOpen with 2.5× threshold) should be forced: dying trying is better than
-      // waiting in COIL until the loop closes fully.
-      const canCoil = currentScore >= 300 || scale >= 1.15;
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.6):
+      // Allow small snakes (score >= 35 or scale >= 1.04) to smoothly coil when pinched
+      // rather than violently oscillating between two enemy walls.
+      // v5.10.6: Raised to score>=80/scale>=1.08 - tiny snakes coil into their own body coffin
+      const canCoil = currentScore >= 80 || scale >= 1.08;
       const pinched = inputs[29] > 0.65 && inputs[30] > 0.65;
       const surrounded = dangerUrgency >= 0.55 && inputs[31] >= 0.33; // >=2 nearby enemies
       if (encirclementEscape && encirclementEscape.isOpen) {
@@ -2083,7 +2131,9 @@
         // Early-warning encirclement (5-6 rays) but no clear gap yet:
         // Enter DEFEND to orient toward widest clearance and avoid COIL lock-in
         stance = 'DEFEND';
-      } else if (canCoil && (pinched || surrounded)) {
+      } else if (canCoil && (pinched || (surrounded && maxCorridorDist <= headRadius * 3.5))) {
+        // v5.10.6+: Only COIL when NO clear escape corridor exists (maxCorridorDist <= headRadius*3.5)
+        // With an open corridor, DEFEND and sprint out is strictly superior to coiling in place
         stance = 'COIL';
       }
       // 2. DEFEND STANCE: Kinematic cut-off threat, acute obstacle danger, or death wall
@@ -2095,7 +2145,7 @@
       else if (constrictCandidate && !outerPredatorNearby && massRatio < 1.15 && dangerUrgency < 0.25 && normWallDist < 0.88) {
         stance = 'CONSTRICT';
       }
-      // 4. POST-KILL CORPSE VACUUM & RICH CORPSE HARVEST (v5.10.4):
+      // 4. POST-KILL CORPSE VACUUM & RICH CORPSE HARVEST (v5.10.6):
       // Immediately harvest massive corpse feast instead of wandering off to chase full-health snakes!
       // Priority above HUNT and above distant ATTACK when post-kill vacuum or rich corpse is present.
       else if (((this.lastKillEpicenter && now < this.vacuumActiveUntil) || richCorpseNearby) && dangerUrgency < 0.38) {
@@ -2121,19 +2171,35 @@
       // A. COIL STANCE: The Apex Defensive Fortress (Circle Method)
       if (stance === 'COIL') {
         this.foodSteerEma *= 0.2; // Suppress food greed while coiling
-        if (!this.coilSign) {
+        // Mid-coil escape pivot (v5.10.6): If a gap opens while in coil, break out immediately!
+        // A tightening encirclement with a visible exit slit => sprint through it; don't spin to death.
+        if (maxCorridorDist > headRadius * 2.5 && encirclingThreatRays >= 4) {
+          // Override to DEFEND so the slit-breach logic handles steering toward the open gap
+          stance = 'DEFEND';
+          this.coilSign = 0;
+          this.combatStance = 'DEFEND';
+          if (!encirclementEscape) {
+            encirclementEscape = {
+              threatRays: encirclingThreatRays,
+              slitDist: maxCorridorDist,
+              slitAngle: bestCorridorAngle,
+              isOpen: true,
+              isEarly: encirclingThreatRays < 7
+            };
+          }
+        } else if (!this.coilSign) {
           this.coilSign = Math.abs(this.prevTurnEma) > 0.25
             ? Math.sign(this.prevTurnEma)
             : reflexSign;
         }
-        turnDelta = this.coilSign * 0.85;
+        if (stance === 'COIL') turnDelta = this.coilSign * 0.85;
       } else {
         this.coilSign = 0;
         // B. DEFEND STANCE: 100% Evasion Priority (Anti-Cut-Off, Death Wall & Obstacle Avoidance)
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.10.4: active from 5 rays, clearance lowered):
+            // Anti-Encirclement Slit Breaching (v5.10.6: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
             const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
             this.flightRecorder.logIncident(breachTag, {
@@ -2182,10 +2248,17 @@
               turnDelta = -cutOffThreat.cutSide * 1.0;
             }
           } else {
-            // Obstacle Avoidance with Pocket Shield Awareness:
+            // Obstacle Avoidance with Pocket Shield Awareness & Corridor Vision:
             // If facing an enemy head and we have a verified body shield flank, bank toward our shield
             if (frontObstacleType === 'head' && selfShieldSide !== 0) {
               turnDelta = selfShieldSide * 1.0;
+            } else if (inputs[31] >= 0.33 && maxCorridorDist > headRadius * 3.5) {
+              // High-Traffic Escape Corridor Steering (v5.10.6):
+              // In dense crowds, steer decisively toward the open corridor instead of hemisphere wiggling
+              let corridorError = bestCorridorAngle - currentAng;
+              while (corridorError > Math.PI) corridorError -= Math.PI * 2;
+              while (corridorError < -Math.PI) corridorError += Math.PI * 2;
+              turnDelta = Math.max(-1, Math.min(1, corridorError / 1.35));
             } else {
               const evasionTurn = (massRatio > 1.5) ? 1.0 : Math.max(0.9, Math.abs(turnDelta));
               turnDelta = reflexSign * evasionTurn;
@@ -2263,9 +2336,10 @@
               foodSteer = Math.max(-1, Math.min(1, (foodTarget.error / 1.85) + crossOffset));
             }
 
+            const safetyGating = dangerUrgency > 0.20 ? Math.max(0, 1 - (dangerUrgency - 0.20) / 0.30) : 1.0;
             const steerWeight = stance === 'VACUUM' ? 0.65 : 0.45;
             this.foodSteerEma = this.foodSteerEma * (1 - steerWeight) + foodSteer * steerWeight;
-            const assist = (stance === 'VACUUM' ? 0.95 : 0.85) * (1 - dangerUrgency);
+            const assist = (stance === 'VACUUM' ? 0.95 : 0.85) * (1 - dangerUrgency) * safetyGating;
             turnDelta = turnDelta * (1 - assist) + this.foodSteerEma * assist;
 
             // When in VACUUM and a rival snake is close while we eat, blend in evasive clearance earlier
@@ -2327,7 +2401,7 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.10.4: wider alignment cone 0.75 rad, lower fuel 0.10):
+          // Emergency Slit Breach Sprint (v5.10.6: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
@@ -2648,6 +2722,9 @@
       this.selfShieldSide = 0;
       this.encirclementEscape = null;
       this.slipstreamTarget = null;
+      this.evasionSign = 0;
+      this.evasionLatchTimer = 0;
+      this.escapeCorridorAngle = null;
       this.teacherQuarantineBuffer = [];
     }
 
@@ -3925,5 +4002,5 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.4 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.6 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();

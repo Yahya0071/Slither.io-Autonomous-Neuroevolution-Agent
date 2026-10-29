@@ -1,4 +1,4 @@
-# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.4 — Forensic Deductor & Pathfinder Flight Recorder Edition)
+# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.6 — Forensic Deductor & Pathfinder Flight Recorder Edition)
 
 A master hybrid agent that plays in the real, official [Slither.io](https://slither.io) game. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, an **Apex Tactical Combat State Machine**, and a **Forensic Deductor & Pathfinder Flight Recorder** that records every encounter, breadcrumb path, and root-cause death autopsy directly into exported checkpoints.
 
@@ -196,4 +196,5 @@ Slither.io's terms of service and may be detected or blocked. It depends on
 reverse-engineered game internals (`window.snake`, `window.xm/ym`,
 `setAcceleration`, `grd`, `gsc`, `foods`, `preys`, `wmd`, …) that are not a
 public API, so a game update can break it without warning. Use at your own risk.
+
 
