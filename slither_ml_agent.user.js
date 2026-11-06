@@ -2068,7 +2068,8 @@
 
       const scale = snake.sc || 1.0;
       const state = this._extractInputs(snake, snakes, foods, preys, dt, now);
-      const {
+      // `let` required: encirclementEscape may be reassigned at the mid-coil escape pivot (line ~2250)
+      let {
         inputs,
         minObstacleDist,
         frontObstacleDist,

@@ -36,7 +36,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
 | **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 136 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover). |
+| **[`tests/`](./tests)** | Node test suite: 142 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover, circling regression). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -180,11 +180,11 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 136 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
+npm test        # 142 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution, circling regression)
 npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 136 tests cover
+### What the 142 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |
@@ -194,6 +194,7 @@ npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy tel
 | **Perception** | 1,200px corpse radar; dense 300-segment body sampling with zero ray tunneling; forward-only obstacle urgency. |
 | **Kill Recognition** | Vanished nearby enemies register confirmed kills, increment live HUD counter, and award dynamic mass-scaled combat bounty (+250 to +600 fitness based on victim scale ratio). |
 | **Neuroevolution** | Anti-stagnation mutation escalation; high-fitness annealed mutation; spawn-kill mulligan; soft teacher tuition blending; strict elitism; Consistency Gate; Silver Brain demotion & mutant candidate adoption; Uniform Crossover at stagnantGens >= 5. |
+| **Circling Regression** | `const→let` fix for `encirclementEscape` reassignment crash in `evaluate()` (mid-coil escape pivot, v5.10.8); v5.10.7 baseline parity for meanSignedTurn and netRevolutions across 5 seeds; crossover-child directional bias guard. |
 | **Gradient Check** | `trainStep` gradients verified against analytical float64 backpropagation across all 2,736 weights and 74 biases. |
 | **Artifact Drift** | All 4 distribution copies byte-identical; package/manifest versions synchronized. |
 
