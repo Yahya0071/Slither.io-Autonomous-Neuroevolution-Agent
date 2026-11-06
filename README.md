@@ -1,6 +1,11 @@
 # Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.7 — Forensic Deductor & Pathfinder Flight Recorder Edition)
 
-A master hybrid agent that plays in the real, official [Slither.io](https://slither.io) game. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, an **Apex Tactical Combat State Machine**, and a **Forensic Deductor & Pathfinder Flight Recorder** that records every encounter, breadcrumb path, and root-cause death autopsy directly into exported checkpoints.
+> [!CAUTION]
+> **Educational & Research Purpose Only — Terms of Service Notice**
+> This repository is developed strictly for academic study and algorithmic research into autonomous multi-agent neuroevolution, imitation learning, and kinematic trajectory prediction.
+> Using automation software, scripts, or bots on live multiplayer game servers directly violates the [official Slither.io Terms of Service](https://slither.io/tos/). Doing so may result in temporary or permanent IP/device bans or legal remedies by the service operators. The authors and contributors do not encourage or condone the use of these tools on public production servers. Use strictly at your own risk in local offline simulation environments.
+
+A master hybrid agent for studying autonomous decision-making in real-time continuous 2D environments. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, an **Apex Tactical Combat State Machine**, and a **Forensic Deductor & Pathfinder Flight Recorder** that records every encounter, breadcrumb path, and root-cause death autopsy directly into exported checkpoints.
 
 Synthesized from the best breakthroughs across the 4 most prominent open-source Slither.io AI repositories:
 - **`dzaczek/slbot`**: Apex Predator Lead Interception Strike ($\tau$-kinematics) & Active Exploratory Scanning
@@ -190,12 +195,17 @@ npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy tel
 
 ---
 
-## ⚠️ Disclaimer
+## ⚠️ Terms of Service & Legal Disclaimer
 
-This automates play on a live multiplayer game. Doing so likely violates
-Slither.io's terms of service and may be detected or blocked. It depends on
-reverse-engineered game internals (`window.snake`, `window.xm/ym`,
-`setAcceleration`, `grd`, `gsc`, `foods`, `preys`, `wmd`, …) that are not a
-public API, so a game update can break it without warning. Use at your own risk.
+> [!WARNING]
+> **Read Before Use:**
+> 1. **Academic & Research Scope:** This software is developed strictly as an educational proof-of-concept demonstrating neuroevolutionary optimization, imitation learning (online behavioral cloning), and kinematic obstacle avoidance in real-time continuous environments.
+> 2. **Terms of Service Violation:** Operating this software on live, public [Slither.io](https://slither.io) servers directly violates the official [Slither.io Terms of Service](https://slither.io/tos/), which explicitly prohibits:
+>    - Developing or using bots, scripts, automation tools, or unauthorized clients.
+>    - Intercepting, capturing, or modifying the behavior or memory of the game client.
+>    - Emulating or interacting with the proprietary game protocol outside official software.
+> 3. **Account & Network Penalties:** The operators of Slither.io reserve the right to detect, throttle, block, or permanently ban IP addresses, devices, and connections associated with unauthorized automation.
+> 4. **No Affiliation or Warranty:** This project is independent, unofficial, and not affiliated with, endorsed by, or associated with Steve Howse, Lowtech Studios LLC, or Slither.io. It depends on internal, undocumented client runtime variables that may change or break at any time.
+> 5. **User Responsibility:** Any use of this code on live public servers is entirely at the user's sole discretion and risk. Contributors and maintainers assume zero liability for misuse, service interruptions, or account penalties.
 
 
