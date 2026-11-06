@@ -1,4 +1,4 @@
-# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.7 — Forensic Deductor & Pathfinder Flight Recorder Edition)
+# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.8 — Crossover & Silver Brain & Pathfinder Flight Recorder Edition)
 
 > [!CAUTION]
 > **Educational & Research Purpose Only — Terms of Service Notice**
@@ -36,7 +36,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
 | **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 119 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors). |
+| **[`tests/`](./tests)** | Node test suite: 132 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -180,11 +180,11 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 119 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
+npm test        # 132 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
 npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 119 tests cover
+### What the 132 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |

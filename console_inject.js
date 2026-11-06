@@ -1,6 +1,6 @@
-﻿/**
+/**
  * Slither.io Autonomous Machine Learning Agent (Console Paste Version)
- * Hybrid Neuroevolution + Imitation Learning Engine v5.10.7 (Forensic Deductor & Pathfinder Flight Recorder Edition)
+ * Hybrid Neuroevolution + Imitation Learning Engine v5.10.8 (Forensic Deductor & Pathfinder Flight Recorder Edition)
  * 
  * SYNTHESIZED FROM THE BEST OPEN-SOURCE REPOSITORIES:
  *  - dzaczek/slbot: Apex Predator Lead Interception Strike & Active Exploratory Scanning
@@ -26,7 +26,7 @@
 (function () {
   'use strict';
 
-  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.7 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
+  console.log('%c[SlitherML] 🚀 Initializing Hybrid Neuroevolution + Imitation Learning Agent v5.10.8 (Forensic Deductor & Pathfinder Flight Recorder Edition)...', 'color: #00f5d4; font-weight: bold; font-size: 14px;');
 
   const STORAGE_KEY = 'slither_ml_champion_weights_v4';
 
@@ -255,6 +255,34 @@
       if (lastBiases && lastBiases.length > 0) {
         lastBiases[0] = Math.max(-0.15, Math.min(0.15, lastBiases[0]));
       }
+    }
+
+    // Uniform Crossover (NEAT-inspired genetic recombination):
+    // Each weight gene is independently sampled from parentA or parentB with
+    // probability p_B (default 0.5). Equivalent to a Mendelian uniform crossover
+    // on aligned weight vectors. Used when stagnantGens >= 5 to escape local
+    // fitness plateaus that pure mutation cannot cross.
+    static crossover(parentA, parentB, pB = 0.5) {
+      const child = NeuralNetwork.fromJSON(parentA.export(), parentA.inputNodes);
+      if (!child || !parentB) return child;
+      for (let layer = 0; layer < child.weights.length; layer++) {
+        const wA = parentA.weights[layer];
+        const wB = parentB.weights[layer];
+        const wC = child.weights[layer];
+        for (let j = 0; j < wC.length; j++) {
+          if (Math.random() < pB) wC[j] = wB[j];
+        }
+        const bA = parentA.biases[layer];
+        const bB = parentB.biases[layer];
+        const bC = child.biases[layer];
+        for (let j = 0; j < bC.length; j++) {
+          if (Math.random() < pB) bC[j] = bB[j];
+        }
+      }
+      // Re-enforce steering bias hydrodynamic bounds after crossover
+      const lastB = child.biases[child.biases.length - 1];
+      if (lastB && lastB.length > 0) lastB[0] = Math.max(-0.15, Math.min(0.15, lastB[0]));
+      return child;
     }
 
     export() {
@@ -626,6 +654,7 @@
       this.inputCount = 32;
       this.brain = new NeuralNetwork(this.inputCount, [48, 24], 2);
       this.championBrain = null;
+      this.silverBrain = null; // Second-best displaced champion — enables genetic crossover
 
       // Multi-Episode Evaluation Architecture
       this.episodesPerGenome = 3;
@@ -745,6 +774,17 @@
         }
       }
 
+      // Restore silver brain if checkpoint contains one
+      if (parsed.silverBrain) {
+        const silver = NeuralNetwork.fromJSON(parsed.silverBrain, this.inputCount);
+        if (silver) {
+          this.silverBrain = silver;
+          const sOutB = this.silverBrain.biases[this.silverBrain.biases.length - 1];
+          if (sOutB && sOutB.length > 0) sOutB[0] = Math.max(-0.15, Math.min(0.15, sOutB[0]));
+        }
+      } else {
+        this.silverBrain = null;
+      }
       this.bestFitness = typeof parsed.bestFitness === 'number' ? parsed.bestFitness : 0;
       this.allTimePeakFitness = typeof parsed.allTimePeakFitness === 'number'
         ? Math.max(parsed.allTimePeakFitness, this.bestFitness)
@@ -932,6 +972,7 @@
       }
       this.brain = new NeuralNetwork(this.inputCount, [48, 24], 2);
       this.championBrain = null;
+      this.silverBrain = null;
       this.generation = 1;
       this.currentEpisode = 1;
       this.episodeFitnesses = [];
@@ -1184,7 +1225,7 @@
             this.enemyTracker.set(id, { xx: other.xx, yy: other.yy, ang: otherAng, vx: 0, vy: 0, omega: 0, timestamp: now, wasClose: distHead < 300, dist: distHead, enemyScale: other.sc || 1.0 });
           }
 
-          // Combat Geometry Evaluation for enemies within 550 units (v5.10.7: expanded from 420)
+          // Combat Geometry Evaluation for enemies within 550 units (v5.10.8: expanded from 420)
           if (distHead < 550) {
             const otherSpeed = (typeof other.sp === 'number' && other.sp > 0) ? other.sp : 5.9;
             const enemySpeedSec = Math.hypot(vx, vy) || (otherSpeed * 60);
@@ -1195,7 +1236,7 @@
             while (relBearing > Math.PI) relBearing -= Math.PI * 2;
             while (relBearing < -Math.PI) relBearing += Math.PI * 2;
 
-            // A. DEFENSIVE THREAT: Flank Cut-Off Anticipation (v5.10.7)
+            // A. DEFENSIVE THREAT: Flank Cut-Off Anticipation (v5.10.8)
             // Extends horizon for boosting and behemoth enemies to avoid high-speed lateral cut-offs
             if (Math.abs(relBearing) < Math.PI * 0.75) {
               const D = cosHead * evy - sinHead * evx;
@@ -1220,7 +1261,7 @@
             }
 
             // B. OFFENSIVE ATTACK OPPORTUNITY: Curvilinear trajectory intercept (Constant Turn-Rate Kinematics)
-            // v5.10.7: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
+            // v5.10.8: Expanded range from 380 to 500. Score gate moved to boost-only; angle intercept works at any size.
             if (distHead >= 60 && distHead <= 500) {
               const enemyScale = other.sc || 1.0;
               if (enemyScale <= scale * 1.6) {
@@ -1274,7 +1315,7 @@
 
             // C. OFFENSIVE BOA CONSTRICTOR (Circle Trap): Target smaller snakes on our flank to encircle
             // Pro Rule: Veto if an outer predator is lurking nearby (Third-Party Perimeter Guard)
-            // v5.10.7: Extended range to 480 for earlier constriction setup
+            // v5.10.8: Extended range to 480 for earlier constriction setup
             if (!outerPredatorNearby && (currentScore >= 500 || scale >= 1.25) && distHead >= 70 && distHead <= 480 && Math.abs(relBearing) >= 0.65) {
               const enemyScale = other.sc || 1.0;
               const enemyScore = (typeof other.sct === 'number' && other.sct > 0) ? other.sct : Math.floor(15 * (enemyScale - 1) / 0.001 || 10);
@@ -1562,7 +1603,7 @@
           }
         }
 
-        // Anti-Encirclement Threat Tracking (v5.10.7):
+        // Anti-Encirclement Threat Tracking (v5.10.8):
         // Count ANY surrounding enemy body/head regardless of size - even same-size snakes
         // wrapping us must be detected to trigger slit-breach escape before COIL lock-in.
         if ((hitType === 'body' || hitType === 'head') && closestDist < sensorRange * 0.85) {
@@ -1608,7 +1649,7 @@
         selfShieldSide = -1; // Right flank shielded by own body
       }
 
-      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.7):
+      // Anti-Encirclement & Escape Slit Breaching Arbiter (v5.10.8):
       // Detect encirclement earlier (>= 5 of 16 rays blocked by larger enemy) to allow
       // proactive slit breach BEFORE the loop fully closes. Lower slit clearance threshold
       // to 2.5× headRadius so a partially-open gap still triggers a forced escape sprint.
@@ -1634,7 +1675,7 @@
         };
       }
 
-      // Multi-Snake Escape Corridor Finder ("Vision" in Traffic v5.10.7):
+      // Multi-Snake Escape Corridor Finder ("Vision" in Traffic v5.10.8):
       // Locates the cleanest continuous gap across all 16 rays to navigate through mosh pits
       let maxCorridorDist = 0;
       let bestCorridorAngle = currentAng;
@@ -1852,7 +1893,7 @@
     }
 
     // Pick the pellet worth steering at: close, valuable, and cheap to reach.
-    // Enhanced with Corpse Cluster Gravity, Kill-Epicenter Lock & Rival Scavenger Repulsion (v5.10.7)
+    // Enhanced with Corpse Cluster Gravity, Kill-Epicenter Lock & Rival Scavenger Repulsion (v5.10.8)
     _pickFoodTarget(currentAng, headX = 0, headY = 0, snakes = null) {
       const list = this.detectedFoods;
       if (!list || list.length === 0) return null;
@@ -2075,7 +2116,7 @@
         ? frontThreatSpeed
         : ((typeof nearestThreatSpeed === 'number' && nearestThreatSpeed > 0) ? nearestThreatSpeed : 5.9);
 
-      // Kinetic Minkowski Danger Clearance with Behemoth Repulsion Bubble (v5.10.7):
+      // Kinetic Minkowski Danger Clearance with Behemoth Repulsion Bubble (v5.10.8):
       // Expands avoidance buffer using combined radii of self and threat, plus both our speed AND enemy closing speed.
       // Proportional multiplier scales up to 3.0x against giant behemoths (massRatio > 1.8) so we give thick bodies a wide berth.
       const currentSpeed = (typeof snake.sp === 'number' && snake.sp > 0) ? snake.sp : 5.9;
@@ -2104,7 +2145,7 @@
       else if (frontObstacleType === 'head' && dangerUrgency > 0.05) {
         dangerUrgency = Math.min(1.0, dangerUrgency * 1.35);
       }
-      // Directional Evasion Latch with Hysteresis (v5.10.7):
+      // Directional Evasion Latch with Hysteresis (v5.10.8):
       // Prevents 60 FPS bang-bang left-right head shaking when surrounded by snakes.
       this.evasionLatchTimer = Math.max(0, (this.evasionLatchTimer || 0) - dt);
       const rawSign = leftClearance >= rightClearance ? 1 : -1;
@@ -2138,10 +2179,10 @@
 
       // ---- TACTICAL COMBAT STANCE ARBITER -----------------------------------
       let stance = 'FORAGE';
-      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.7):
+      // 1. ANTI-ENCIRCLEMENT SLIT BREACHING vs COIL STANCE (v5.10.8):
       // Allow small snakes (score >= 35 or scale >= 1.04) to smoothly coil when pinched
       // rather than violently oscillating between two enemy walls.
-      // v5.10.7: Raised to score>=80/scale>=1.08 - tiny snakes coil into their own body coffin
+      // v5.10.8: Raised to score>=80/scale>=1.08 - tiny snakes coil into their own body coffin
       const canCoil = currentScore >= 80 || scale >= 1.08;
       const pinched = inputs[29] > 0.65 && inputs[30] > 0.65;
       const surrounded = dangerUrgency >= 0.55 && inputs[31] >= 0.33; // >=2 nearby enemies
@@ -2153,7 +2194,7 @@
         // Enter DEFEND to orient toward widest clearance and avoid COIL lock-in
         stance = 'DEFEND';
       } else if (canCoil && (pinched || (surrounded && maxCorridorDist <= headRadius * 3.5))) {
-        // v5.10.7+: Only COIL when NO clear escape corridor exists (maxCorridorDist <= headRadius*3.5)
+        // v5.10.8+: Only COIL when NO clear escape corridor exists (maxCorridorDist <= headRadius*3.5)
         // With an open corridor, DEFEND and sprint out is strictly superior to coiling in place
         stance = 'COIL';
       }
@@ -2166,7 +2207,7 @@
       else if (constrictCandidate && !outerPredatorNearby && massRatio < 1.15 && dangerUrgency < 0.25 && normWallDist < 0.88) {
         stance = 'CONSTRICT';
       }
-      // 4. POST-KILL CORPSE VACUUM & RICH CORPSE HARVEST (v5.10.7):
+      // 4. POST-KILL CORPSE VACUUM & RICH CORPSE HARVEST (v5.10.8):
       // Immediately harvest massive corpse feast instead of wandering off to chase full-health snakes!
       // Priority above HUNT and above distant ATTACK when post-kill vacuum or rich corpse is present.
       else if (((this.lastKillEpicenter && now < this.vacuumActiveUntil) || richCorpseNearby) && dangerUrgency < 0.38) {
@@ -2192,7 +2233,7 @@
       // A. COIL STANCE: The Apex Defensive Fortress (Circle Method)
       if (stance === 'COIL') {
         this.foodSteerEma *= 0.2; // Suppress food greed while coiling
-        // Mid-coil escape pivot (v5.10.7): If a gap opens while in coil, break out immediately!
+        // Mid-coil escape pivot (v5.10.8): If a gap opens while in coil, break out immediately!
         // A tightening encirclement with a visible exit slit => sprint through it; don't spin to death.
         if (maxCorridorDist > headRadius * 2.5 && encirclingThreatRays >= 4) {
           // Override to DEFEND so the slit-breach logic handles steering toward the open gap
@@ -2220,7 +2261,7 @@
         if (stance === 'DEFEND') {
           this.foodSteerEma *= 0.5; // Suppress food greed
           if (encirclementEscape && encirclementEscape.isOpen) {
-            // Anti-Encirclement Slit Breaching (v5.10.7: active from 5 rays, clearance lowered):
+            // Anti-Encirclement Slit Breaching (v5.10.8: active from 5 rays, clearance lowered):
             // Steer hard toward the open exit slit before the encircling predator's loop closes
             const breachTag = encirclementEscape.isEarly ? 'SLIT_BREACH_EARLY' : 'SLIT_BREACH_ESCAPE';
             this.flightRecorder.logIncident(breachTag, {
@@ -2274,7 +2315,7 @@
             if (frontObstacleType === 'head' && selfShieldSide !== 0) {
               turnDelta = selfShieldSide * 1.0;
             } else if (inputs[31] >= 0.33 && maxCorridorDist > headRadius * 3.5) {
-              // High-Traffic Escape Corridor Steering (v5.10.7):
+              // High-Traffic Escape Corridor Steering (v5.10.8):
               // In dense crowds, steer decisively toward the open corridor instead of hemisphere wiggling
               let corridorError = bestCorridorAngle - currentAng;
               while (corridorError > Math.PI) corridorError -= Math.PI * 2;
@@ -2422,7 +2463,7 @@
       } else if (stance === 'DEFEND') {
         // Defensive Boost Protocol:
         if (encirclementEscape && encirclementEscape.isOpen) {
-          // Emergency Slit Breach Sprint (v5.10.7: wider alignment cone 0.75 rad, lower fuel 0.10):
+          // Emergency Slit Breach Sprint (v5.10.8: wider alignment cone 0.75 rad, lower fuel 0.10):
           let slitError = encirclementEscape.slitAngle - currentAng;
           while (slitError > Math.PI) slitError -= Math.PI * 2;
           while (slitError < -Math.PI) slitError += Math.PI * 2;
@@ -2849,6 +2890,10 @@
         this.stagnantGens = 0;
         this.bestFitness = aggregateFitness;
         this.allTimePeakFitness = Math.max(this.allTimePeakFitness || 0, aggregateFitness);
+        // Demote current champion to silver before crowning the new one
+        if (this.championBrain) {
+          this.silverBrain = NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
+        }
         this.championBrain = NeuralNetwork.fromJSON(this.brain.export(), this.inputCount);
         console.log(`%c[SlitherML] 🏆 NEW CHAMPION (${origin})! Gen ${this.generation} — Best-2-of-3 aggregate ${Math.floor(aggregateFitness)} (mean ${Math.floor(meanFitness)}, median ${Math.floor(sorted[1])}), previous ${Math.floor(previousBest)}`, 'color: #00f5d4; font-weight: bold;');
       } else {
@@ -2911,7 +2956,17 @@
       // Breed the next genome with Anti-Stagnation Adaptive Mutation (from MEMWashburn/NEAT)
       // and High-Fitness Annealed Mutation (for elite champions > 30000 fitness).
       if (this.championBrain) {
-        const baseBrain = NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
+        // Recombination: when stuck in a plateau for >= 5 gens and a silver brain
+        // exists, breed via uniform crossover(champion, silver) instead of a pure
+        // clone. This combines complementary sub-skills from two elite lineages and
+        // explores regions of weight-space that point-mutation alone cannot reach.
+        const useCrossover = this.stagnantGens >= 5 && this.silverBrain;
+        const baseBrain = useCrossover
+          ? NeuralNetwork.crossover(this.championBrain, this.silverBrain)
+          : NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
+        if (useCrossover) {
+          console.log(`%c[SlitherML] 🧬 Recombination (Stagnant Gen ${this.stagnantGens}): breeding via crossover(champion, silver) to escape fitness plateau!`, 'color: #a855f7; font-weight: bold;');
+        }
         if (baseBrain) {
           if ((mutantWorthyOfBlend || teacherWorthyOfBreedingBlend || isProdigyRun) && this.brain) {
             let blendRatio = 0.15;
@@ -2988,6 +3043,7 @@
           brain: championExport,
           activeBrain: activeExport,
           hasChampion: Boolean(this.championBrain),
+          silverBrain: this.silverBrain ? this.silverBrain.export() : null,
           bestFitness: this.bestFitness,
           allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
           generation: this.generation,
@@ -3046,6 +3102,7 @@
         brain: (this.championBrain || this.brain).export(),
         activeBrain: this.brain.export(),
         hasChampion: Boolean(this.championBrain),
+        silverBrain: this.silverBrain ? this.silverBrain.export() : null,
         bestFitness: this.bestFitness,
         allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
         generation: this.generation,
@@ -4013,5 +4070,5 @@
     getTelemetry: () => pageWindow._slitherMLController.agent.flightRecorder.getTelemetrySummary(),
     exportCheckpoint: () => pageWindow._slitherMLController.agent.exportCheckpoint()
   };
-  console.log('%c[SlitherML] 🚀 SlitherML v5.10.7 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
+  console.log('%c[SlitherML] 🚀 SlitherML v5.10.8 (Forensic Deductor & Pathfinder Flight Recorder) is RUNNING!', 'color: #00f5d4; font-size: 16px; font-weight: bold;');
 })();
