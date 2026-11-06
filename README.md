@@ -31,7 +31,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
 | **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 100 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense). |
+| **[`tests/`](./tests)** | Node test suite: 119 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -59,9 +59,9 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 
 ---
 
-## 🛡️ The 6-Stance Tactical Matrix & Mass-Ratio Radar
+## 🛡️ The 7-Stance Tactical Matrix & Mass-Ratio Radar
 
-The agent dynamically evaluates surrounding game state, calculates relative scale ($\rho = \frac{\text{scale}_{\text{threat}}}{\text{scale}_{\text{self}}}$) and Minkowski collision clearance, and arbitrates between six distinct combat postures:
+The agent dynamically evaluates surrounding game state, calculates relative scale ($\rho = \frac{\text{scale}_{\text{threat}}}{\text{scale}_{\text{self}}}$) and Minkowski collision clearance, and arbitrates between seven distinct combat postures:
 
 ```
                           ┌───────────────────────────┐
@@ -72,7 +72,7 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
                  ┌──────────────────────┼──────────────────────┐
                  ▼                      ▼                      ▼
         [Severe Threat /       [Vulnerable Flank       [Surrounded /
-         Kinematic Cut-Off]      Score >= 80]           Score >= 300]
+         Kinematic Cut-Off]      Score >= 80]           Score >= 80 & No Exit]
                  │                      │                      │
                  ▼                      ▼                      ▼
         ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -93,14 +93,15 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
 ```
 
 1. **`🌾 FORAGE` (Cyan `#00f5d4`)**: Dual-tier food scavenging (ambient pellets up to 650px, dead snake debris & glowing preys up to 1,200px). When no food is in sight, activates exploratory patrol sweeping ($\pm 14^\circ$ at $0.6\text{Hz}$) to scan dark map areas.
-2. **`🛡️ DEFEND` (Amber `#ffb703` / Crimson `#ef4444` on Behemoth)**: Kinematic 2D ray-intersection collision avoidance with **Dynamic Minkowski Clearance** ($D_{\text{danger}} = (R_{\text{self}} + R_{\text{threat}}) \times 2.25 + \text{speedBuffer}$). If facing a **Behemoth** ($\rho > 1.5$), escalates urgency $+35\%$, widens counter-banking arcs, and vetoes sprints. When pinched on flanks with forward open space, engages **Emergency Escape Sprint**. Also acts as **Boundary Wall Guard** near arena perimeter (`normWallDist > 0.91`).
+2. **`🛡️ DEFEND` (Amber `#ffb703` / Crimson `#ef4444` on Behemoth)**: Kinematic 2D ray-intersection collision avoidance with **Dynamic Minkowski Clearance** ($D_{\text{danger}} = (R_{\text{self}} + R_{\text{threat}}) \times 2.25 + \text{speedBuffer}$). If facing a **Behemoth** ($\rho > 1.4$ to $1.8+$), scales clearance multiplier up to $3.0\times$, escalates urgency up to $+60\%$, widens counter-banking arcs, and vetoes sprints. When pinched on flanks with forward open space, engages **Emergency Escape Sprint**. Also acts as **Boundary Wall Guard** near arena perimeter (`normWallDist > 0.91`).
 3. **`⚔️ ATTACK` (Crimson `#ff0055`)**: Constant Turn-Rate and Acceleration (CTRA) Curvilinear Trajectory Interception ($\omega = \frac{\Delta \theta}{\Delta t}$). Projects intercepts along curved flight paths. Strictly vetoed against behemoths ($\rho > 1.5$) to prevent suicidal head-on collisions.
-4. **`🌀 COIL` (Deep Violet `#a855f7`)**: When snake score $\ge 300$ and surrounded by multiple close enemies or pinched on both flanks, loops in a tight continuous circular orbit. Head stays protected inside its own body coils until threats disperse.
-5. **`🐍 CONSTRICT` (Purple `#c084fc`)**: Offensive Boa Constrictor trap. When alongside smaller flank prey ($\rho \le 0.65, |\text{relBearing}| \ge 0.65$), circles around prey with short boost pulses to entrap them inside body coils.
-6. **`🍖 VACUUM` (Sky Blue `#38bdf8`)**: Post-Kill Corpse Vacuum. Following confirmed kills, latches the 1,200px loot epicenter for 4.0s with a 3x weight multiplier and rush sprints to harvest mass before rivals arrive.
+4. **`🌀 COIL` (Deep Violet `#a855f7`)**: When snake score $\ge 80$ (or scale $\ge 1.08$) and surrounded by multiple close enemies without an open escape corridor ($D_{\text{corridor}} \le 3.5 R_{\text{self}}$), loops in a tight continuous circular orbit. Head stays protected inside its own body coils until threats disperse. If an exit corridor opens mid-coil, a pivot immediately breaks out into `DEFEND` sprint.
+5. **`🐍 CONSTRICT` (Purple `#c084fc`)**: Offensive Boa Constrictor trap. When alongside smaller flank prey ($\rho \le 0.65, |\text{relBearing}| \ge 0.65$), circles around prey with cruising speed to entrap them gaplessly inside body coils.
+6. **`🍖 VACUUM` (Sky Blue `#38bdf8`)**: Post-Kill Corpse Vacuum. Following confirmed kills, latches the loot epicenter for 6.5s with a 3x weight multiplier, calculates local corpse cluster density gravity, and skims safe edges while checking for rival scavengers.
+7. **`🏹 HUNT` (Orange `#fb923c`)**: Active Predator Pursuit. Actively stalks and pressures nearby enemy snakes within range when safe ($D_{\text{urgency}} < 0.25$), steering ahead of their movement trajectory with angle lead to force cut-offs or collisions while earning proximity fitness shaping.
 
 ### 📐 Relative Mass Ratio & Minkowski Danger Expansion Engine
-- **Minkowski Danger Clearance**: Traditional bots calculate danger clearance using only their own head radius ($R_{\text{self}} \times 4.5$), underestimating collision distances with giant snakes. SlitherML expands the clearance space to $(R_{\text{self}} + R_{\text{threat}}) \times 2.25 + \text{speedBuffer}$, providing realistic spatial safety regardless of enemy size.
+- **Minkowski Danger Clearance**: Traditional bots calculate danger clearance using only their own head radius ($R_{\text{self}} \times 4.5$), underestimating collision distances with giant snakes. SlitherML expands the clearance space to $(R_{\text{self}} + R_{\text{threat}}) \times \text{multiplier} + \text{speedBuffer}$ (scaling dynamically up to $3.0\times$ against behemoths $\rho > 1.8$), providing realistic spatial safety regardless of enemy size.
 - **Scale-Weighted Threat Severity**: Cut-off threats are weighted by $\min(2.5, \max(0.5, \rho))$, preventing small newborn worms from causing panic 180° turns while prioritizing giant cutting threats.
 - **Apex Dominance**: When the agent is substantially larger than surrounding snakes ($\rho < 0.65$), threat dampening allows the agent to maintain lucrative feeding runs without yielding food to tiny worms.
 
@@ -170,11 +171,11 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 100 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
+npm test        # 119 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
 npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 100 tests cover
+### What the 119 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |
