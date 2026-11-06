@@ -306,7 +306,7 @@ test('crossover breeding: NOT used when silverBrain is null even when stagnantGe
   const { agent, logs } = withChampion({ fitness: 1000, stagnantGens: 10 });
   assert.equal(agent.silverBrain, null, 'silverBrain must be null for this test');
 
-  // Losing rollout — should NOT crossover because no silver brain
+  // Losing rollout below 75% — no silver candidate qualified
   for (let ep = 0; ep < EPISODES; ep++) {
     agent.fitness = 100;
     agent.survivalTime = 40;
@@ -316,3 +316,141 @@ test('crossover breeding: NOT used when silverBrain is null even when stagnantGe
   const recombinationLog = logs.find(l => l.includes('Recombination'));
   assert.ok(!recombinationLog, 'Must not crossover when silverBrain is null');
 });
+
+// ---------------------------------------------------------------------------
+// 11. Stalled checkpoint with no silver gets one from a qualifying mutant
+// ---------------------------------------------------------------------------
+test('silver candidate: stalled checkpoint with no silver gets one from qualifying mutant (>= 75%)', () => {
+  // Simulate stalled checkpoint like Gen 337 (stagnantGens: 270, silverBrain: null)
+  const { agent, NeuralNetwork, logs } = withChampion({ fitness: 30000, stagnantGens: 270 });
+  assert.equal(agent.silverBrain, null, 'initially no silver brain');
+  assert.equal(agent.silverSource, null);
+
+  // Run autonomous mutant rollout scoring 24,000 (80% of champ -> qualifies for mutantWorthyOfBlend)
+  const mutantFP = fingerprint(NeuralNetwork.fromJSON(agent.brain.export(), INPUTS));
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 24000;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+
+  // Did not beat champion (24000 < 30000), but qualified as silver candidate
+  assert.ok(agent.silverBrain !== null, 'qualifying mutant must be saved as silver candidate');
+  assert.equal(agent.silverSource, 'mutant', 'source must be marked mutant');
+  assert.equal(agent.silverFitness, 24000, 'recorded fitness must match aggregate');
+  const silverFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(silverFP, mutantFP), 'silverBrain matches qualifying mutant weights');
+
+  // And since stagnantGens >= 5 (it was 270), the subsequent breed triggered Recombination!
+  const recombinationLog = logs.find(l => l.includes('Recombination'));
+  assert.ok(recombinationLog, 'Subsequent breeding should trigger crossover recombination');
+});
+
+// ---------------------------------------------------------------------------
+// 12. Better-scoring mutant replaces candidate, but lower-scoring does not
+// ---------------------------------------------------------------------------
+test('silver candidate: better-scoring mutant replaces candidate, lower does not', () => {
+  const { agent, NeuralNetwork } = withChampion({ fitness: 30000, stagnantGens: 10 });
+
+  // First qualifying mutant: scores 23,000 (>= 75% of 30,000 = 22,500)
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 23000;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+  assert.equal(agent.silverFitness, 23000);
+  const firstSilverFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+
+  // Second mutant: scores 22,800 (>= 75%, but lower than 23,000 -> must NOT replace)
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 22800;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+  assert.equal(agent.silverFitness, 23000, 'lower-scoring mutant must not replace candidate');
+  const afterLowerFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(afterLowerFP, firstSilverFP), 'weights unchanged after lower candidate');
+
+  // Third mutant: scores 26,000 (higher than 23,000 -> MUST replace)
+  const betterMutantFP = fingerprint(NeuralNetwork.fromJSON(agent.brain.export(), INPUTS));
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 26000;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+  assert.equal(agent.silverFitness, 26000, 'higher-scoring mutant replaces candidate');
+  const afterHigherFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(afterHigherFP, betterMutantFP), 'weights updated to higher candidate');
+});
+
+// ---------------------------------------------------------------------------
+// 13. A displaced champion still takes priority over mutant candidates
+// ---------------------------------------------------------------------------
+test('silver priority: displaced champion takes priority over mutant candidates', () => {
+  const { agent, NeuralNetwork } = withChampion({ fitness: 1000, stagnantGens: 0 });
+
+  // Crown a new champion (displaces old champion to silver with fitness 1000)
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 2000;
+    agent.survivalTime = 60;
+    agent.onDeath(false);
+  }
+  assert.equal(agent.silverSource, 'champion', 'real displaced champion has source champion');
+  assert.equal(agent.silverFitness, 1000);
+  const champSilverFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+
+  // A subsequent mutant achieves 1,800 (which is 90% of current champ 2000 > 75%)
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 1800;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+
+  // Must NOT overwrite the real displaced champion!
+  assert.equal(agent.silverSource, 'champion', 'source must remain champion');
+  assert.equal(agent.silverFitness, 1000, 'fitness must remain former champion fitness');
+  const currentSilverFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(currentSilverFP, champSilverFP), 'real displaced champion weights preserved');
+});
+
+// ---------------------------------------------------------------------------
+// 14. Fallback silver candidate round-trips through checkpoint
+// ---------------------------------------------------------------------------
+test('silver candidate: round-trips cleanly through checkpoint export/import', () => {
+  const storage = new MemoryStorage();
+  const harness1 = loadAgent({ storage });
+  const agent1 = harness1.newAgent();
+  agent1.resetBrain();
+  agent1.bestFitness = 20000;
+  agent1.allTimePeakFitness = 20000;
+  agent1.stagnantGens = 15;
+  const { NeuralNetwork } = harness1;
+  agent1.championBrain = NeuralNetwork.fromJSON(agent1.brain.export(), INPUTS);
+
+  // Mutant qualifies with 16,000 (80% of 20,000)
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent1.fitness = 16000;
+    agent1.survivalTime = 50;
+    agent1.onDeath(false);
+  }
+  assert.equal(agent1.silverSource, 'mutant');
+  assert.equal(agent1.silverFitness, 16000);
+  const silverFP = fingerprint(NeuralNetwork.fromJSON(agent1.silverBrain.export(), INPUTS));
+
+  // Export checkpoint and load into fresh agent
+  const checkpoint = JSON.parse(agent1.exportCheckpoint());
+  assert.equal(checkpoint.silverSource, 'mutant');
+  assert.equal(checkpoint.silverFitness, 16000);
+
+  const harness2 = loadAgent({ storage: new MemoryStorage() });
+  const agent2 = harness2.newAgent();
+  agent2.applySavedState(checkpoint);
+
+  assert.ok(agent2.silverBrain !== null);
+  assert.equal(agent2.silverSource, 'mutant');
+  assert.equal(agent2.silverFitness, 16000);
+  const restoredFP = fingerprint(harness2.NeuralNetwork.fromJSON(agent2.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(restoredFP, silverFP), 'restored candidate matches original');
+});
+
+

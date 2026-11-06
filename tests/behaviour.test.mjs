@@ -316,7 +316,7 @@ test('confirmed kill detection: tracks vanished nearby enemy and awards kill bou
   const initialFit = agent.fitness;
   agent._extractInputs(snake, [], [], [], 0.0167, 1050);
   assert.equal(agent.kills, 1, 'must detect confirmed kill #1');
-  assert.ok(agent.fitness >= initialFit + 150.0, 'must award +150 fitness bounty');
+  assert.ok(agent.fitness >= initialFit + 250.0, 'must award >= +250 fitness bounty');
 });
 
 test('dynamic mass-scaled combat bounty: scales bounty between +250 and +600 based on victim-to-self scale ratio', () => {

@@ -10,7 +10,7 @@ A master hybrid agent for studying autonomous decision-making in real-time conti
 Synthesized from the best breakthroughs across the 4 most prominent open-source Slither.io AI repositories:
 - **`dzaczek/slbot`**: Apex Predator Lead Interception Strike (`τ`-kinematics) & Active Exploratory Scanning
 - **`ErmiyaEskandary/Slither.io-bot`**: The Legendary Circle Method (`🌀 COIL` Stance) & Dual-Zone Arena Boundary Wall Guard
-- **`MEMWashburn/Slither.io-NEAT`**: Confirmed Kill Bounty Recognition (+250 Fitness) & Anti-Stagnation Adaptive Mutation
+- **`MEMWashburn/Slither.io-NEAT`**: Confirmed Kill Bounty Recognition (scaled +250 to +600 Fitness) & Anti-Stagnation Adaptive Mutation
 - **`JuiHsiu/Slither-DRL`**: Mass-ROI Boost Governor & Anti-Jitter Hydrodynamic Steering Filter
 
 ---
@@ -21,7 +21,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | :--- | :--- | :--- | :--- |
 | **[`dzaczek/slbot`](https://github.com/dzaczek/slbot)** | Dueling DQN + PyTorch via Selenium | 70–120ms Python-to-browser IPC latency caused fatal cut-offs | **Velocity-scaled lead intercept strikes**: predicts enemy future head coordinates (`τ = 0.25–0.60s`) with crossing curls, plus exploratory sweeps to eliminate passive drifting. |
 | **[`ErmiyaEskandary/Slither.io-bot`](https://github.com/ErmiyaEskandary/Slither.io-bot)** (~2.5k stars) | Community Heuristic Rule Engine | Static & predictable; lacked machine learning adaptability | **The Circle Method (`🌀 COIL` Stance)**: forms an impenetrable body fortress when surrounded or pinched. **Dual-Zone Boundary Defense**: prevents perimeter wall deaths. |
-| **[`MEMWashburn/Slither.io-NEAT`](https://github.com/MEMWashburn/Slither.io-NEAT)** | Genetic Algorithm (NEAT) | Random networks died on spawn; degenerate center circles | **Confirmed Kill Recognition**: tracks vanished rival snakes and awards +150 fitness bounties. **Anti-Stagnation Mutation**: escalates mutation rate (0.06 → 0.12) to escape local minima. |
+| **[`MEMWashburn/Slither.io-NEAT`](https://github.com/MEMWashburn/Slither.io-NEAT)** | Genetic Algorithm (NEAT) | Random networks died on spawn; degenerate center circles | **Confirmed Kill Recognition**: tracks vanished rival snakes and awards dynamic mass-scaled combat bounties (+250 to +600 fitness based on victim scale ratio). **Anti-Stagnation Mutation**: escalates mutation rate (0.06 → 0.12) to escape local minima. |
 | **[`JuiHsiu/Slither-DRL`](https://github.com/JuiHsiu/Slither-DRL)** | DRL (Actor-Critic / A2C) via Gym | "Boost-Bleed": held spacebar continuously, shrinking from 300 to 10 | **Mass-ROI Boost Governor**: strictly calculates expected mass burned vs pellet value; hard-stops sprints below minimum score thresholds. Double-smoothed steering eliminates jitter. |
 
 ---
@@ -36,7 +36,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
 | **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 132 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors). |
+| **[`tests/`](./tests)** | Node test suite: 136 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -142,9 +142,9 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
   ```
   To prevent erratic 1-run fluke mutants from hijacking the champion slot, a **Consistency Gate** requires the median run to be at least 40% of the champion's score (`Median ≥ 0.40 × previousBest`). Unavoidable server spawn-kills (< 3.5s survival with < 60 fitness, or < 5.0s with < 40 fitness and zero growth) grant an immediate mulligan and are excluded from the rollout.
 - **Strict Elitism, Persistent Peak Floor & Fast Evolutionary Programming (FEP)**:
-  - **Calibrated Rewards**: Confirmed kills yield +250 fitness, ensuring stable length scaling isn't eclipsed by lucky combat RNG spikes. Survival bonus dynamically escalates during stagnation (`4.0 + min(6.0, stagnantGens × 0.5)`) to incentivize endurance.
+  - **Calibrated Rewards**: Confirmed kills yield a dynamic mass-scaled combat bounty between +250 and +600 fitness (`round(250 + min(350, max(0, (killRatio - 0.75) × 450)))`), rewarding takedowns of larger predators while preventing lucky hatchling kills from distorting evolutionary selection. Survival bonus dynamically escalates during stagnation (`4.0 + min(6.0, stagnantGens × 0.5)`) to incentivize endurance.
   - **Fast Evolutionary Programming (Cauchy Lévy Flights & Xavier Spectral Scaling)**: Mutations draw from a hybrid distribution (85% Gaussian micro-tuning + 15% heavy-tailed Cauchy perturbations `tan(π(U - 0.5))`). Because Cauchy distributions have heavy polynomial tails, genomes execute occasional Lévy flights over fitness barriers, provably escaping local minima plateaus. Mutation strengths scale inversely with layer fan-in (`σ_l = σ_0 × √(24 / n_in)`) to preserve activation variances across deep layers.
-  - **Persistent Plateau Floor**: If evolution stagnates for ≥ 6 consecutive generations, gentle 0.5% plateau relief eases the bar; at ≥ 15 generations, relief accelerates to 1.0%. `allTimePeakFitness` is persisted across sessions and page reloads, enforcing an uncompromised **85% floor** (`bestFitness ≥ 0.85 × allTimePeakFitness`).
+  - **Adaptive Plateau Relief & Multi-Tier Floor**: If evolution stagnates for ≥ 6 consecutive generations without a new champion, gentle 0.5% plateau relief eases the bar (`bestFitness × 0.995`); at ≥ 15 generations, relief accelerates to 1.0% (`bestFitness × 0.990`). `allTimePeakFitness` is persisted across sessions and page reloads. To prevent permanent evolution freezes in high-generation lineages, an adaptive plateau floor bounds the decay based on stagnation depth: standard floor is **85%** (`stagnantGens < 50`), easing to **75%** during deep stagnation (`50 ≤ stagnantGens < 60`), and to **70%** during extreme stagnation (`stagnantGens ≥ 60`).
   - **Spawn Protection**: Rollouts with fewer than 2 valid episodes due to mulligans automatically extend rather than granting unearned generation advances.
 - **Autonomous Mutant Soft Trait Retention (Polyak Blending)**: When an autonomous mutant demonstrates solid performance by achieving an aggregate score ≥ 75% of the champion (`Aggregate ≥ 0.75 × previousBest`), 15% of its weights are softly blended into the breeding template (`baseBrain`) for subsequent generations (`W_seed = 0.85 × W_champ + 0.15 × W_mutant`), accelerating evolutionary search while keeping `championBrain` strictly untouched.
 
@@ -155,7 +155,7 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
 - **Candidate Evaluation & Two-Tier Tuition Preservation**: Trained teacher networks prove themselves over a 3-autonomous-life evaluation rollout without ever losing tuition:
   - **Tier 1 (Champion Crown)**: Beat the current champion fitness (`Aggregate > bestFitness`) while passing the Consistency Gate (`Median >= 0.40 × previousBest`) to be crowned as the new champion.
   - **Tier 2 (Champion Soft-Blend - 20%)**: When a candidate achieves ≥ 35% of champion fitness OR ≥ 5,000 points, 20% of its learned weights are permanently integrated into `championBrain` and `stagnantGens` resets to 0 without lowering `bestFitness`.
-  - **Tier 3 (Breeding Seed Blend - 15%)**: If a chaotic public server cuts the candidate's rollout short (< 35% and < 5,000), `championBrain` remains 100% untouched and protected, but 15% of the candidate's weights are blended into the mutant breeding template (`baseBrain`). Human tuition never evaporates!
+  - **Tier 3 (Candidate Breed Blend - 15%)**: If a chaotic public server cuts the candidate's rollout short (< 35% and < 5,000), `championBrain` remains 100% untouched and protected, but 15% of the candidate's weights are blended once into the next generation's local breeding template (`baseBrain`) before mutation, saving the resulting network as `activeBrain` for the next rollout.
 
 ---
 
@@ -180,20 +180,20 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 132 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
+npm test        # 136 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution)
 npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 132 tests cover
+### What the 136 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |
 | **Tactical Combat** | Minkowski dynamic clearance & Behemoth evasion (`🛡️ DEFEND`); Anti-Encirclement Slit Breaching (`BREACH`); kinetic enemy boost velocity clearance expansion; Slipstream wake drafting; semantic object radar dampening on own body shield (`'self'`); Pocket Shield Defense against enemy head attacks; predator dynamic lead sprint (`⚔️ ATTACK`); defensive coil fortress (`🌀 COIL`); gapless offensive boa constrictor with Third-Party Perimeter Guard (`🐍 CONSTRICT`); post-kill corpse loot vacuum with "The Cross" perpendicular sweep (`🍖 VACUUM`); Angular Boost Gating (`R_turn = v / ω`); fleeing chase pellet lead interception; Emergency Escape Sprint; Apex dominance; death wall repulsion. |
-| **Flight Recorder & Autopsy** | 60-frame rolling FIFO buffer; automatic death root cause classification (`ARENA_WALL`, `HEAD_ON_RAM`, `FLANK_CUTOFF`, `ENCIRCLED_TRAP`, `BOOST_STARVATION`); pathfinder breadcrumb coordinate downsampling; stance duty cycle percentages; arena spatial zone distribution (center/midfield/perimeter); milestone growth timeline; checkpoint telemetry serialization. |
+| **Flight Recorder & Autopsy** | 60-frame rolling FIFO buffer; automatic death root cause classification (9 emitted causes: `ARENA_WALL`, `ENCIRCLED_TRAP`, `HEAD_ON_RAM`, `HEAD_ON_JOUST`, `ATTACK_OVEREXTENDED`, `FLANK_CUTOFF`, `BODY_COLLISION`, `BOOST_STARVATION`, `SUDDEN_IMPACT`); pathfinder breadcrumb coordinate downsampling; stance duty cycle percentages; arena spatial zone distribution (center/midfield/perimeter); milestone growth timeline; checkpoint telemetry serialization. |
 | **Mass & Boost Economy** | No boosting for plain pellets; unsafe sprint rejection; Mass-ROI boost governor; length preservation. |
 | **Perception** | 1,200px corpse radar; dense 300-segment body sampling with zero ray tunneling; forward-only obstacle urgency. |
-| **Kill Recognition** | Vanished nearby enemies register confirmed kills, increment live HUD counter, and award +500 fitness. |
-| **Neuroevolution** | Anti-stagnation mutation escalation; high-fitness annealed mutation; spawn-kill mulligan; soft teacher tuition blending; strict elitism; 3-life rollout aggregate; candidate validation. |
+| **Kill Recognition** | Vanished nearby enemies register confirmed kills, increment live HUD counter, and award dynamic mass-scaled combat bounty (+250 to +600 fitness based on victim scale ratio). |
+| **Neuroevolution** | Anti-stagnation mutation escalation; high-fitness annealed mutation; spawn-kill mulligan; soft teacher tuition blending; strict elitism; Consistency Gate; Silver Brain demotion & mutant candidate adoption; Uniform Crossover at stagnantGens >= 5. |
 | **Gradient Check** | `trainStep` gradients verified against analytical float64 backpropagation across all 2,736 weights and 74 biases. |
 | **Artifact Drift** | All 4 distribution copies byte-identical; package/manifest versions synchronized. |
 

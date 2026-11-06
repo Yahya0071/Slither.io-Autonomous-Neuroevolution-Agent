@@ -655,6 +655,8 @@
       this.brain = new NeuralNetwork(this.inputCount, [48, 24], 2);
       this.championBrain = null;
       this.silverBrain = null; // Second-best displaced champion — enables genetic crossover
+      this.silverFitness = 0;
+      this.silverSource = null; // 'champion' | 'mutant' | null
 
       // Multi-Episode Evaluation Architecture
       this.episodesPerGenome = 3;
@@ -785,6 +787,8 @@
       } else {
         this.silverBrain = null;
       }
+      this.silverFitness = typeof parsed.silverFitness === 'number' ? parsed.silverFitness : 0;
+      this.silverSource = parsed.silverSource || (this.silverBrain ? 'champion' : null);
       this.bestFitness = typeof parsed.bestFitness === 'number' ? parsed.bestFitness : 0;
       this.allTimePeakFitness = typeof parsed.allTimePeakFitness === 'number'
         ? Math.max(parsed.allTimePeakFitness, this.bestFitness)
@@ -973,6 +977,8 @@
       this.brain = new NeuralNetwork(this.inputCount, [48, 24], 2);
       this.championBrain = null;
       this.silverBrain = null;
+      this.silverFitness = 0;
+      this.silverSource = null;
       this.generation = 1;
       this.currentEpisode = 1;
       this.episodeFitnesses = [];
@@ -2893,6 +2899,8 @@
         // Demote current champion to silver before crowning the new one
         if (this.championBrain) {
           this.silverBrain = NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
+          this.silverFitness = previousBest;
+          this.silverSource = 'champion';
         }
         this.championBrain = NeuralNetwork.fromJSON(this.brain.export(), this.inputCount);
         console.log(`%c[SlitherML] 🏆 NEW CHAMPION (${origin})! Gen ${this.generation} — Best-2-of-3 aggregate ${Math.floor(aggregateFitness)} (mean ${Math.floor(meanFitness)}, median ${Math.floor(sorted[1])}), previous ${Math.floor(previousBest)}`, 'color: #00f5d4; font-weight: bold;');
@@ -2918,6 +2926,22 @@
           const decayed = Math.max(minBar, this.bestFitness * 0.995);
           console.log(`%c[SlitherML] 📉 Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar gently eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-0.5%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');
           this.bestFitness = decayed;
+        }
+
+        // Fallback Silver Candidate: When no real displaced champion exists (or current silver
+        // is also a mutant candidate), remember the best qualifying non-crowned autonomous mutant
+        // (scoring >= 75% of champion) as the silver candidate for genetic crossover.
+        if (mutantWorthyOfBlend && this.silverSource !== 'champion') {
+          if (!this.silverBrain || aggregateFitness > (this.silverFitness || 0)) {
+            this.silverBrain = NeuralNetwork.fromJSON(this.brain.export(), this.inputCount);
+            if (this.silverBrain && this.silverBrain.biases && this.silverBrain.biases.length > 0) {
+              const sOutB = this.silverBrain.biases[this.silverBrain.biases.length - 1];
+              if (sOutB && sOutB.length > 0) sOutB[0] = Math.max(-0.15, Math.min(0.15, sOutB[0]));
+            }
+            this.silverFitness = aggregateFitness;
+            this.silverSource = 'mutant';
+            console.log(`%c[SlitherML] 🥈 Silver candidate adopted: autonomous mutant scoring ${Math.floor(aggregateFitness)} (>= 75% of champ ${Math.floor(previousBest)}) saved for crossover recombination.`, 'color: #94a3b8; font-weight: bold;');
+          }
         }
 
         if (this.candidatePending) {
@@ -3044,6 +3068,8 @@
           activeBrain: activeExport,
           hasChampion: Boolean(this.championBrain),
           silverBrain: this.silverBrain ? this.silverBrain.export() : null,
+          silverFitness: this.silverFitness || 0,
+          silverSource: this.silverSource || null,
           bestFitness: this.bestFitness,
           allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
           generation: this.generation,
@@ -3103,6 +3129,8 @@
         activeBrain: this.brain.export(),
         hasChampion: Boolean(this.championBrain),
         silverBrain: this.silverBrain ? this.silverBrain.export() : null,
+        silverFitness: this.silverFitness || 0,
+        silverSource: this.silverSource || null,
         bestFitness: this.bestFitness,
         allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
         generation: this.generation,
