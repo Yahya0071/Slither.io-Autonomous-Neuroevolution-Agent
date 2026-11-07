@@ -9,9 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadAgent } from '../agent-loader.mjs';
-
-const { NeuralNetwork } = loadAgent();
+import { NeuralNetwork } from '../src/index.js';
 
 const INPUTS = 32;
 const HIDDEN = [48, 24];

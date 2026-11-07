@@ -35,6 +35,17 @@ export function extractClass(src, name) {
   throw new Error(`unterminated class ${name} in console_inject.js`);
 }
 
+/** Pull any module helper functions out of the bundle (if modularized). */
+export function extractHelpers(src) {
+  const marker = 'const getAllSnakes = () => pageWindow.snakes || pageWindow.slithers || [];';
+  const start = src.indexOf(marker);
+  const end = src.indexOf('class NeuralNetwork {');
+  if (start >= 0 && end > start) {
+    return src.slice(start + marker.length, end);
+  }
+  return '';
+}
+
 /** The storage key is read from source so a rename cannot silently pass tests. */
 function readStorageKey(src) {
   const m = src.match(/const STORAGE_KEY = '([^']+)'/);
@@ -72,6 +83,7 @@ export function loadAgent({ storage = new MemoryStorage(), window: win = {}, col
   const recorderSrc = extractClass(sourceCode, 'FlightRecorder');
   const agentSrc = extractClass(sourceCode, 'SlitherMLAgent');
   const storageKey = readStorageKey(sourceCode);
+  const helpersSrc = extractHelpers(sourceCode);
 
   const logs = [];
   const shimConsole = collectLogs
@@ -90,7 +102,11 @@ export function loadAgent({ storage = new MemoryStorage(), window: win = {}, col
     'pageWindow',
     `"use strict";
      if (typeof pageWindow === 'undefined') { var pageWindow = window; }
+     const getPageWindow = () => pageWindow;
+     const getPlayerSnake = () => pageWindow.snake || pageWindow.slither || null;
+     const getAllSnakes = () => pageWindow.snakes || pageWindow.slithers || [];
      const STORAGE_KEY = ${JSON.stringify(storageKey)};
+     ${helpersSrc}
      ${nnSrc}
      ${recorderSrc}
      ${agentSrc}

@@ -1,25 +1,37 @@
+# Dependencies
+node_modules/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Historical checkpoints archive & untracked run artifacts
+checkpoints_archive/
+.checkpoints_archive/
+checkpoints/*
+!checkpoints/slither_ml_brain_gen100.json
+
+# Build and distribution intermediates (if any)
+dist/
+dist-ssr/
 *.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-_legacy_ref.js
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

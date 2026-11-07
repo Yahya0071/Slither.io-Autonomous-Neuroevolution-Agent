@@ -1,216 +1,191 @@
-# Slither.io Autonomous Neuroevolution & Imitation Learning Agent (v5.10.8 — Crossover & Silver Brain & Pathfinder Flight Recorder Edition)
+# SlitherML: Autonomous Neuroevolution & Imitation Learning Agent
+
+[![Node.js CI](https://github.com/Yahya0071/Slither.io-Autonomous-Neuroevolution-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Yahya0071/Slither.io-Autonomous-Neuroevolution-Agent/actions)
+![Node Version](https://img.shields.io/badge/node-%3E%3D22.8-brightgreen)
+![Dependencies](https://img.shields.io/badge/dependencies-0-blue)
+![Tests](https://img.shields.io/badge/tests-146%20passing-success)
 
 > [!CAUTION]
 > **Educational & Research Purpose Only — Terms of Service Notice**
-> This repository is developed strictly for academic study and algorithmic research into autonomous multi-agent neuroevolution, imitation learning, and kinematic trajectory prediction.
-> Using automation software, scripts, or bots on live multiplayer game servers directly violates the [official Slither.io Terms of Service](https://slither.io/tos/). Doing so may result in temporary or permanent IP/device bans or legal remedies by the service operators. The authors and contributors do not encourage or condone the use of these tools on public production servers. Use strictly at your own risk in local offline simulation environments.
+> This repository is developed strictly for academic study and algorithmic research into multi-agent continuous control, neuroevolution, online imitation learning, and kinematic trajectory prediction.
+> Automated interaction with live multiplayer game servers violates the [Slither.io Terms of Service](https://slither.io/tos/). This software is intended for local study and offline simulation environments. Users assume full responsibility for compliance with third-party service terms.
 
-A master hybrid agent for studying autonomous decision-making in real-time continuous 2D environments. Powered by a **32-input -> 48 -> 24 -> 2 deep neural network** combining **Multi-Episode Neuroevolution**, **Real-Time Online Imitation Learning with Failure-Trauma Filtering (Teacher Mode)**, an **Apex Tactical Combat State Machine**, and a **Forensic Deductor & Pathfinder Flight Recorder** that records every encounter, breadcrumb path, and root-cause death autopsy directly into exported checkpoints.
+SlitherML is a zero-dependency autonomous agent for the continuous 2D environment of Slither.io. It pairs a **32-input feedforward neural network** (32 → 48 → 24 → 2) with a **7-stance tactical combat state machine**, a **multi-episode neuroevolution engine**, an **online imitation learning subsystem (Teacher Mode)**, and a **flight recorder** for post-death trajectory autopsy and telemetry.
 
-Synthesized from the best breakthroughs across the 4 most prominent open-source Slither.io AI repositories:
-- **`dzaczek/slbot`**: Apex Predator Lead Interception Strike (`τ`-kinematics) & Active Exploratory Scanning
-- **`ErmiyaEskandary/Slither.io-bot`**: The Legendary Circle Method (`🌀 COIL` Stance) & Dual-Zone Arena Boundary Wall Guard
-- **`MEMWashburn/Slither.io-NEAT`**: Confirmed Kill Bounty Recognition (scaled +250 to +600 Fitness) & Anti-Stagnation Adaptive Mutation
-- **`JuiHsiu/Slither-DRL`**: Mass-ROI Boost Governor & Anti-Jitter Hydrodynamic Steering Filter
+The project combines and refines techniques from prior open-source Slither.io agents:
+- **Lead Interception & Scanning**: Kinematic lead intercept and exploratory sweeping (`dzaczek/slbot`).
+- **Orbital Defense**: Circular coiling when surrounded, and dual-zone boundary wall repulsion (`ErmiyaEskandary/Slither.io-bot`).
+- **Combat Rewards & Mutation**: Confirmed kill detection with mass-scaled bounties and anti-stagnation mutation schedules (`MEMWashburn/Slither.io-NEAT`).
+- **Actuation Economics**: Mass-ROI sprint governor and inertia-filtered steering (`JuiHsiu/Slither-DRL`).
 
 ---
 
-## 🏛️ Open-Source Repository Benchmark & Synthesis
+## Architecture Overview
 
-| Repository | Original Approach | Original Vulnerability / Trap | What We Synthesized Into Our "Super One" Engine |
+```
+                      ┌────────────────────────────────────────┐
+                      │          ENVIRONMENT SENSORS           │
+                      │ 16 Proximity Rays  •  8 Food Sectors   │
+                      │ Kinematic Threat & Arena Center Fields │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │          NEURAL POLICY (32-D)          │
+                      │       Dense MLP: 32 -> 48 -> 24 -> 2   │
+                      │    Turn Delta (tanh) • Boost Prob (σ)  │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │       TACTICAL COMBAT ARBITER          │
+                      │ FORAGE • DEFEND • ATTACK • COIL        │
+                      │ CONSTRICT • VACUUM • HUNT              │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │         KINEMATIC ACTUATION            │
+                      │ Steering Assist  •  Mass-ROI Boost Gov │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │      FLIGHT RECORDER & TELEMETRY       │
+                      │ 60-Frame FIFO Buffer  •  Death Autopsy │
+                      └────────────────────────────────────────┘
+```
+
+For detailed specifications of the sensor pipeline, network activations, and training loops, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+---
+
+## Tactical Stance Matrix
+
+The tactical arbiter evaluates relative mass `ρ = scale_threat / scale_self`, local obstacle geometry, and corridor clearances to select one of seven operational postures:
+
+| Stance | Primary Objective | Trigger Conditions | Actuation Profile |
 | :--- | :--- | :--- | :--- |
-| **[`dzaczek/slbot`](https://github.com/dzaczek/slbot)** | Dueling DQN + PyTorch via Selenium | 70–120ms Python-to-browser IPC latency caused fatal cut-offs | **Velocity-scaled lead intercept strikes**: predicts enemy future head coordinates (`τ = 0.25–0.60s`) with crossing curls, plus exploratory sweeps to eliminate passive drifting. |
-| **[`ErmiyaEskandary/Slither.io-bot`](https://github.com/ErmiyaEskandary/Slither.io-bot)** (~2.5k stars) | Community Heuristic Rule Engine | Static & predictable; lacked machine learning adaptability | **The Circle Method (`🌀 COIL` Stance)**: forms an impenetrable body fortress when surrounded or pinched. **Dual-Zone Boundary Defense**: prevents perimeter wall deaths. |
-| **[`MEMWashburn/Slither.io-NEAT`](https://github.com/MEMWashburn/Slither.io-NEAT)** | Genetic Algorithm (NEAT) | Random networks died on spawn; degenerate center circles | **Confirmed Kill Recognition**: tracks vanished rival snakes and awards dynamic mass-scaled combat bounties (+250 to +600 fitness based on victim scale ratio). **Anti-Stagnation Mutation**: escalates mutation rate (0.06 → 0.12) to escape local minima. |
-| **[`JuiHsiu/Slither-DRL`](https://github.com/JuiHsiu/Slither-DRL)** | DRL (Actor-Critic / A2C) via Gym | "Boost-Bleed": held spacebar continuously, shrinking from 300 to 10 | **Mass-ROI Boost Governor**: strictly calculates expected mass burned vs pellet value; hard-stops sprints below minimum score thresholds. Double-smoothed steering eliminates jitter. |
+| **`FORAGE`** | Food collection & map exploration | No immediate lethal threats within buffer distance | Dual-tier food targeting (ambient pellets ≤ 650u, debris ≤ 1,200u); exploratory sweeps (±14° at 0.6 Hz) when empty. |
+| **`DEFEND`** | Collision avoidance & boundary safety | Frontal collision risk, high enemy mass ratio, or wall proximity | Dynamic Minkowski buffer `(R_self + R_threat) × mult + speedBuffer`; counter-banks away from threat; emergency escape sprint when path is clear. |
+| **`ATTACK`** | Intercept strike across enemy path | Vulnerable target identified, score ≥ 80, enemy not a behemoth (`ρ ≤ 1.5`) | Constant Turn-Rate and Acceleration (CTRA) trajectory lead intercept with crossing curl assist and sprint. |
+| **`COIL`** | Self-protective orbit | Score ≥ 80, pinched by multiple threats with no open escape corridor | Enters continuous circular loop inside own body coils until surrounding threats disperse or an escape corridor opens. |
+| **`CONSTRICT`** | Entrapment orbit | Parallel to smaller prey (`ρ ≤ 0.65`) with flank bearing | Cruising-speed orbit tightening around target while checking for outer third-party predators. |
+| **`VACUUM`** | Rapid corpse harvesting | Confirmed kill recorded or dense corpse cluster detected | 6.5s priority lock on loot epicenter; high-value cluster attraction with rival scavenger avoidance. |
+| **`HUNT`** | Stalking and pressure | Smaller snake nearby in open space with low danger urgency | Tracks target trajectory with leading offset to force defensive errors while earning proximity shaping reward. |
 
 ---
 
-## 📁 Project Structure
+## Dual Learning Paradigms
 
-| File / Folder | Description |
-| :--- | :--- |
-| **[`console_inject.js`](./console_inject.js)** | **Single source of truth.** Single-file IIFE script to paste directly into your browser's DevTools Console (`F12`). |
-| **[`slither_ml_agent.user.js`](./slither_ml_agent.user.js)** | Tampermonkey / Violentmonkey userscript. **Generated** from `console_inject.js`. |
-| **[`extension/`](./extension)** | Chrome / Edge Extension (Manifest V3) that injects the agent automatically. [`extension/agent.js`](./extension/agent.js) is **generated**. |
-| **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
-| **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
-| **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 142 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover, circling regression). |
+### 1. Neuroevolution (Autopilot)
+- **Multi-Episode Evaluation**: Evaluates each candidate genome over 3 separate episodes. Drops the single lowest score and averages the top 2: `Aggregate = (Run_top1 + Run_top2) / 2`.
+- **Consistency Gate**: Rejects single-life lucky flukes; requires median life fitness `Median ≥ 0.40 × previousBest`.
+- **Mulligan Filter**: Immediate respawn deaths (< 3.5s survival and score growth < 10) are discarded without penalizing candidate fitness.
+- **Plateau Relief & Floor**: When stagnant for ≥ 6 generations without a new champion, fitness bar eases by 0.5% per generation (accelerating to 1.0% at ≥ 15 generations). The decay is bounded from below by an adaptive floor based on all-time peak fitness:
+  - Standard floor: **85%** of peak (`stagnantGens < 50`)
+  - Intermediate floor: **75%** of peak (`50 ≤ stagnantGens < 60`)
+  - Deep relief floor: **70%** of peak (`stagnantGens ≥ 60`)
+- **Fast Evolutionary Programming (FEP)**: Mutations sample from a hybrid distribution (85% Gaussian micro-tuning + 15% Cauchy heavy-tailed perturbations) with Xavier fan-in scaling (`σ_l = σ_0 × √(24 / n_in)`).
+- **Uniform Crossover & Silver Brain**: When stagnation reaches ≥ 5 generations and a qualifying secondary genome (displaced champion or mutant scoring ≥ 40% of champion) exists, offspring are bred via 50/50 uniform crossover between the champion and silver genomes.
 
-> ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
-
----
-
-## 🎮 How to Install & Run
-
-### Method 1: Browser DevTools Console (Fastest — 5 Seconds)
-1. Navigate to [https://slither.io](https://slither.io) in Chrome, Edge, Brave, or Firefox.
-2. Press `F12` (or `Ctrl + Shift + J` / Right-Click ➔ **Inspect**) and click the **Console** tab.
-3. Open [`console_inject.js`](./console_inject.js), copy the entire content, paste it into the console, and press `Enter`.
-4. Click **Play** on the Slither home screen — the agent takes steering control immediately with the neon HUD.
-
-### Method 2: Tampermonkey / Violentmonkey Userscript (Auto-Loads)
-1. Install the [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) browser extension.
-2. Open the extension dashboard and create a **New Userscript**.
-3. Copy the entire content of [`slither_ml_agent.user.js`](./slither_ml_agent.user.js), paste it in, and save (`Ctrl + S`).
-4. Visit [https://slither.io](https://slither.io) — the agent will activate automatically every match.
-
-### Method 3: Unpacked Chrome Extension
-1. Open `chrome://extensions` in your browser.
-2. Enable **Developer mode** (top-right toggle).
-3. Click **Load unpacked** and select the [`extension/`](./extension) folder in this repository.
-4. Open [https://slither.io](https://slither.io).
+### 2. Online Imitation Learning (Teacher Mode)
+- **Real-Time Backpropagation**: Toggle with `[T]` to take manual control. The network shadows human inputs and updates weights online using stochastic gradient descent with momentum (`μ = 0.80`).
+- **Binary Cross-Entropy for Boost**: Boost activation is trained under BCE loss, providing a linear gradient error signal (`y - ŷ`) that prevents saturation.
+- **Quarantined Tuition Buffer**: Input samples are stored in a rolling buffer. If a death occurs, the terminal crash frames (last 0.5–1.0s) are discarded to prevent learning panic errors.
+- **Candidate Validation**: After completing a teacher session, the trained brain must prove itself across a full 3-episode autonomous evaluation before claiming the champion slot.
 
 ---
 
-## 🛡️ The 7-Stance Tactical Matrix & Mass-Ratio Radar
-
-The agent dynamically evaluates surrounding game state, calculates relative scale `ρ = scale_threat / scale_self` and Minkowski collision clearance, and arbitrates between seven distinct combat postures:
+## Repository Structure
 
 ```
-                          ┌───────────────────────────┐
-                          │   GAME SENSORY PIPELINE   │
-                          │   16 Rays + 8 Food Octants │
-                          └─────────────┬─────────────┘
-                                        │
-                 ┌──────────────────────┼──────────────────────┐
-                 ▼                      ▼                      ▼
-        [Severe Threat /       [Vulnerable Flank       [Surrounded /
-         Kinematic Cut-Off]      Score >= 80]           Score >= 80 & No Exit]
-                 │                      │                      │
-                 ▼                      ▼                      ▼
-        ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-        │   🛡️ DEFEND     │    │   ⚔️ ATTACK     │    │    🌀 COIL      │
-        │ Counter-Bank &  │    │ Lead Intercept  │    │ Circle Fortress │
-        │ Emergency Brake │    │ Sprint Across   │    │ Body Shielding  │
-        └─────────────────┘    └─────────────────┘    └─────────────────┘
-                 ▲                      ▲                      ▲
-                 └──────────────────────┼──────────────────────┘
-                                        │
-                            [Normal Scavenging & Radar]
-                                        ▼
-                               ┌─────────────────┐
-                               │   🌾 FORAGE     │
-                               │ Dual-Tier Radar │
-                               │ Mass-ROI Boost  │
-                               └─────────────────┘
+├── src/                          # Modular ES source files
+│   ├── network.js                # NeuralNetwork class (forward, SGD, mutate, crossover)
+│   ├── flight-recorder.js        # FlightRecorder class (telemetry buffer, autopsy deductor)
+│   ├── perception.js             # 16-ray proximity sensor, food radar, corridor search
+│   ├── stances.js                # Tactical state machine, steering assists, boost governor
+│   ├── evolution.js              # Rollout scoring, consistency gate, breeding schedules
+│   ├── agent.js                  # SlitherMLAgent state machine & persistence
+│   ├── controller.js             # SlitherMLController HUD, event bindings, canvas overlay
+│   └── index.js                  # Public API module export index
+├── extension/                    # Manifest V3 Chrome/Edge extension
+├── tests/                        # Node.js built-in test runner test suite (146 tests)
+├── sim/                          # Offline headless simulation & analysis tools
+├── docs/                         # Baseline, consistency audit, and evolution diagnosis
+├── build.mjs                     # Zero-dependency bundler and artifact parity verifier
+├── console_inject.js             # Generated console distribution bundle
+├── slither_ml_agent.user.js      # Generated userscript distribution bundle
+├── quick_start.html              # Generated local testing & dashboard interface
+└── package.json                  # Project manifest (Node >= 22.8, zero dependencies)
 ```
 
-1. **`🌾 FORAGE` (Cyan `#00f5d4`)**: Dual-tier food scavenging (ambient pellets up to 650px, dead snake debris & glowing preys up to 1,200px). When no food is in sight, activates exploratory patrol sweeping (±14° at 0.6 Hz) to scan dark map areas.
-2. **`🛡️ DEFEND` (Amber `#ffb703` / Crimson `#ef4444` on Behemoth)**: Kinematic 2D ray-intersection collision avoidance with **Dynamic Minkowski Clearance** (`D_danger = (R_self + R_threat) × 2.25 + speedBuffer`). If facing a **Behemoth** (`ρ > 1.4` to `1.8+`), scales clearance multiplier up to `3.0×`, escalates urgency up to `+60%`, widens counter-banking arcs, and vetoes sprints. When pinched on flanks with forward open space, engages **Emergency Escape Sprint**. Also acts as **Boundary Wall Guard** near arena perimeter (`normWallDist > 0.91`).
-3. **`⚔️ ATTACK` (Crimson `#ff0055`)**: Constant Turn-Rate and Acceleration (CTRA) Curvilinear Trajectory Interception (`ω = Δθ / Δt`). Projects intercepts along curved flight paths. Strictly vetoed against behemoths (`ρ > 1.5`) to prevent suicidal head-on collisions.
-4. **`🌀 COIL` (Deep Violet `#a855f7`)**: When snake score ≥ 80 (or scale ≥ 1.08) and surrounded by multiple close enemies without an open escape corridor (`D_corridor ≤ 3.5 × R_self`), loops in a tight continuous circular orbit. Head stays protected inside its own body coils until threats disperse. If an exit corridor opens mid-coil, a pivot immediately breaks out into `DEFEND` sprint.
-5. **`🐍 CONSTRICT` (Purple `#c084fc`)**: Offensive Boa Constrictor trap. When alongside smaller flank prey (`ρ ≤ 0.65, |relBearing| ≥ 0.65 rad`), circles around prey with cruising speed to entrap them gaplessly inside body coils.
-6. **`🍖 VACUUM` (Sky Blue `#38bdf8`)**: Post-Kill Corpse Vacuum. Following confirmed kills, latches the loot epicenter for 6.5s with a 3x weight multiplier, calculates local corpse cluster density gravity, and skims safe edges while checking for rival scavengers.
-7. **`🏹 HUNT` (Orange `#fb923c`)**: Active Predator Pursuit. Actively stalks and pressures nearby enemy snakes within range when safe (`D_urgency < 0.25`), steering ahead of their movement trajectory with angle lead to force cut-offs or collisions while earning proximity fitness shaping.
+---
 
-### 📐 Relative Mass Ratio & Minkowski Danger Expansion Engine
-- **Minkowski Danger Clearance**: Traditional bots calculate danger clearance using only their own head radius (`R_self × 4.5`), underestimating collision distances with giant snakes. SlitherML expands the clearance space to `(R_self + R_threat) × multiplier + speedBuffer` (scaling dynamically up to `3.0×` against behemoths `ρ > 1.8`), providing realistic spatial safety regardless of enemy size.
-- **Scale-Weighted Threat Severity**: Cut-off threats are weighted by `min(2.5, max(0.5, ρ))`, preventing small newborn worms from causing panic 180° turns while prioritizing giant cutting threats.
-- **Apex Dominance**: When the agent is substantially larger than surrounding snakes (`ρ < 0.65`), threat dampening allows the agent to maintain lucrative feeding runs without yielding food to tiny worms.
+## Installation & Usage
 
-### 👁️ Semantic Object Radar & Pocket Shield Defense (v5.8.0)
-- **Object-Classified Ray Perception**: Rather than treating all ray intersections as generic lethal obstacles, SlitherML identifies the true semantic type of every surrounding entity:
-  - 🚨 **`'head'` (Enemy Head)**: Active kinetic predator capable of turning, cutting, and boosting. Evasion urgency escalated +35% to trigger immediate proactive counter-banking.
-  - 🛡️ **`'self'` (Own Body Shield)**: In Slither.io, own-body collisions cause **ZERO** damage. Danger urgency dampened by 75% when facing own body coils, eliminating false panic turns and allowing smooth coil navigation.
-  - 🧱 **`'body'` (Enemy Flank)**: Passive moving wall; safe for parallel drafting and pinning.
-  - ⚡ **`'wall'` (Arena Boundary)**: Lethal boundary void; commands hard inward center-seeking turn with boost shutdown.
-- **Pocket Shield Defense**: When cut off or threatened by an enemy head on one flank while our own body shield is flanking the opposite side, the agent executes **Pocket Defense** — steering hard into its own impenetrable body shield (`turnDelta = selfShieldSide * 1.0`), safely hiding behind its own armor coils where the enemy cannot strike without dying.
-- **Combat Reflex Tuition**: During Teacher Mode, encountering an active enemy head (`frontObstacleType === 'head'`) automatically elevates the adaptive learning rate to `η = 0.008`, baking critical anti-head evasion and counter-banking reflexes deeply into the neural network weights.
-- **Live Semantic Radar HUD**: Displays real-time obstacle classifications (`🚨 HEAD ALERT`, `🛡️ SHIELD (L/R)`, `🧱 ENEMY FLANK`, `⚡ ARENA WALL`, `🌾 CLEAR`) with color-coded raycaster beams.
+### Option A: Browser DevTools Console
+1. Open [https://slither.io](https://slither.io) in any modern browser.
+2. Open DevTools (`F12` or `Ctrl + Shift + J`).
+3. Copy the contents of [`console_inject.js`](./console_inject.js) into the console and press Enter.
+4. Start a game; the agent and HUD overlay activate automatically.
 
-### 🏆 Grandmaster Tactics & Failure-Trauma Filter (v5.9.0)
-- **🚪 Anti-Encirclement Slit Breaching**: When an enemy behemoth attempts to trap our snake inside a tightening body loop (≥ 7 rays blocked by a larger predator), the agent scans for the widest open exit gap (`slitDist > headRadius * 4.5`). Instead of passively waiting inside in `COIL` stance, it vetoes coiling, aligns directly with the slit, and executes an **Emergency Slit Breach Sprint** before the loop seals shut.
-- **🛡️ Failure-Trauma Filter (Quarantined Tuition)**: Human player deaths in Teacher Mode are often preceded by 0.5–1.0s of fatal error inputs. SlitherML buffers incoming tuition in a quarantined FIFO queue. Updates are backpropagated into weights only after surviving past the quarantine window; upon death, all quarantined frames are permanently incinerated so the AI never learns human crash errors.
-- **⚡ Kinetic Enemy Boost Velocity Clearance**: `dangerDistance` expands based on both our speed and the approaching enemy's speed:
-  ```
-  D_danger = (R_self + R_threat) × 2.25 + speedBuffer_self + max(0, (v_threat - 5.5) × 18)
-  ```
-  Sprinting projectile enemies traveling at speeds of 12–14 trigger proactive counter-banking and braking over 120px earlier.
-- **💨 Slipstream Wake Drafting**: Detects sprinting enemies ahead and doubles the forage priority of their ejected boost exhaust trails, allowing the snake to draft behind rivals and harvest mass at zero fuel cost.
+### Option B: Userscript (Tampermonkey / Violentmonkey)
+1. Install Tampermonkey or Violentmonkey.
+2. Create a new userscript and paste the contents of [`slither_ml_agent.user.js`](./slither_ml_agent.user.js).
+3. Navigate to [https://slither.io](https://slither.io).
+
+### Option C: Chrome / Edge Extension (Manifest V3)
+1. Go to `chrome://extensions` and enable **Developer mode**.
+2. Click **Load unpacked** and select the [`extension/`](./extension) directory.
 
 ---
 
-## 🕹️ Hybrid Learning Modes
+## In-Game Keybindings
 
-### 1. Autopilot Mode (Neuroevolution) — Default
-- **How it works**: The AI pilots the snake autonomously using its neural policy.
-- **Best-2-of-3 Rollout Scoring with Consistency Gate**: Every genome is tested across 3 full lives. To prevent unlucky server lag spikes or instant cuts from discarding elite breakthrough genomes, the single lowest life is dropped and the top 2 runs are averaged:
-  ```
-  Aggregate Fitness = (Run_top1 + Run_top2) / 2
-  ```
-  To prevent erratic 1-run fluke mutants from hijacking the champion slot, a **Consistency Gate** requires the median run to be at least 40% of the champion's score (`Median ≥ 0.40 × previousBest`). Unavoidable server spawn-kills (< 3.5s survival with < 60 fitness, or < 5.0s with < 40 fitness and zero growth) grant an immediate mulligan and are excluded from the rollout.
-- **Strict Elitism, Persistent Peak Floor & Fast Evolutionary Programming (FEP)**:
-  - **Calibrated Rewards**: Confirmed kills yield a dynamic mass-scaled combat bounty between +250 and +600 fitness (`round(250 + min(350, max(0, (killRatio - 0.75) × 450)))`), rewarding takedowns of larger predators while preventing lucky hatchling kills from distorting evolutionary selection. Survival bonus dynamically escalates during stagnation (`4.0 + min(6.0, stagnantGens × 0.5)`) to incentivize endurance.
-  - **Fast Evolutionary Programming (Cauchy Lévy Flights & Xavier Spectral Scaling)**: Mutations draw from a hybrid distribution (85% Gaussian micro-tuning + 15% heavy-tailed Cauchy perturbations `tan(π(U - 0.5))`). Because Cauchy distributions have heavy polynomial tails, genomes execute occasional Lévy flights over fitness barriers, provably escaping local minima plateaus. Mutation strengths scale inversely with layer fan-in (`σ_l = σ_0 × √(24 / n_in)`) to preserve activation variances across deep layers.
-  - **Adaptive Plateau Relief & Multi-Tier Floor**: If evolution stagnates for ≥ 6 consecutive generations without a new champion, gentle 0.5% plateau relief eases the bar (`bestFitness × 0.995`); at ≥ 15 generations, relief accelerates to 1.0% (`bestFitness × 0.990`). `allTimePeakFitness` is persisted across sessions and page reloads. To prevent permanent evolution freezes in high-generation lineages, an adaptive plateau floor bounds the decay based on stagnation depth: standard floor is **85%** (`stagnantGens < 50`), easing to **75%** during deep stagnation (`50 ≤ stagnantGens < 60`), and to **70%** during extreme stagnation (`stagnantGens ≥ 60`).
-  - **Spawn Protection**: Rollouts with fewer than 2 valid episodes due to mulligans automatically extend rather than granting unearned generation advances.
-- **Autonomous Mutant Soft Trait Retention (Polyak Blending)**: When an autonomous mutant demonstrates solid performance by achieving an aggregate score ≥ 75% of the champion (`Aggregate ≥ 0.75 × previousBest`), 15% of its weights are softly blended into the breeding template (`baseBrain`) for subsequent generations (`W_seed = 0.85 × W_champ + 0.15 × W_mutant`), accelerating evolutionary search while keeping `championBrain` strictly untouched.
-
-### 2. Teacher Mode (Online Imitation Learning) — Press `[T]`
-- **How it works**: Press `[T]` or `[B]` at any point to take manual control. Starting Teacher Mode initializes tuition from the pristine `championBrain` rather than an exploration mutant.
-- **Maximum Likelihood BCE Loss & Low-Pass Momentum Filter**: Boost probability is optimized via Binary Cross-Entropy loss (`L_BCE = -[y ln(ŷ) + (1-y) ln(1-ŷ)]`). Under BCE, pre-activation error gradient is strictly linear (`δ_boost = y - ŷ`), eliminating the vanishing gradient of MSE + Sigmoid and accelerating boost tuition by 20×. Updates incorporate low-pass inertial momentum (`μ = 0.80`) to filter out high-frequency 60 FPS human mouse jitter.
-- **L2 Decay & Centering**: L2 weight decay (`1 - lr × 0.002`) prevents network saturation, while output steering bias centering decay (0.985) and tight clamping ([-0.15, 0.15]) eliminate permanent one-sided turn drift.
-- **Candidate Evaluation & Two-Tier Tuition Preservation**: Trained teacher networks prove themselves over a 3-autonomous-life evaluation rollout without ever losing tuition:
-  - **Tier 1 (Champion Crown)**: Beat the current champion fitness (`Aggregate > bestFitness`) while passing the Consistency Gate (`Median >= 0.40 × previousBest`) to be crowned as the new champion.
-  - **Tier 2 (Champion Soft-Blend - 20%)**: When a candidate achieves ≥ 35% of champion fitness OR ≥ 5,000 points, 20% of its learned weights are permanently integrated into `championBrain` and `stagnantGens` resets to 0 without lowering `bestFitness`.
-  - **Tier 3 (Candidate Breed Blend - 15%)**: If a chaotic public server cuts the candidate's rollout short (< 35% and < 5,000), `championBrain` remains 100% untouched and protected, but 15% of the candidate's weights are blended once into the next generation's local breeding template (`baseBrain`) before mutation, saving the resulting network as `activeBrain` for the next rollout.
+| Key | Function |
+| :---: | :--- |
+| **`[T]`** / **`[B]`** | Toggle between Autopilot (autonomous AI) and Teacher Mode (manual play + online learning). |
+| **`[V]`** | Toggle sensor ray visualization and food radar HUD overlay. |
+| **`[R]`** | Toggle auto-respawn supervisor on/off. |
+| **`[O]`** | Output the root-cause autopsy of the last death to the browser console. |
+| **`[A]`** | Load the Gen 100 Apex Champion preset checkpoint (prompts confirmation if active champion is higher). |
+| **`[E]`** | Export the current neural weights and flight telemetry as a JSON checkpoint. |
+| **`[I]`** | Open file selector to import a previously saved JSON checkpoint. |
+| **`[X]`** | Reset weights to Generation 1 random baseline. |
 
 ---
 
-## ⌨️ In-Game Hotkeys
+## Development & Testing
 
-| Hotkey | Action | Description |
-| :---: | :--- | :--- |
-| **`[T]`** or **`[B]`** | **Toggle Autopilot / Teacher** | Switch between autonomous AI driving and human teacher shadowing. |
-| **`[V]`** | **Toggle Vision Rays** | Show/hide the real-time neon raycaster and food sector radar canvas. |
-| **`[R]`** | **Toggle Auto-Respawn** | Automatically click play and re-enter games 24/7 upon death. |
-| **`[O]`** | **View Death Autopsy** | Print a full forensic death autopsy report with killer profile & pre-crash telemetry to DevTools console. |
-| **`[A]`** | **Load Apex Preset** | Instantly load pre-trained Gen 100 Champion (168 kills, 1.08M lessons, 37.1k floor) with overwrite protection. |
-| **`[X]`** | **Reset Brain** | Wipe stored champion weights and restart evolution at Generation 1. |
-| **`[E]`** | **Export Brain** | Download complete JSON checkpoint backup of current brain and training state. |
-| **`[I]`** | **Import Brain** | Load and resume from a saved JSON brain checkpoint file. |
+The project has zero production and development dependencies, relying strictly on Node.js built-in modules (`node:fs`, `node:crypto`, `node:test`, `node:assert/strict`).
 
----
+### Prerequisites
+- Node.js ≥ 22.8
 
-## 🛠️ Development
-
-Requires Node.js ≥ 22.8. Zero external dependencies.
-
+### Commands
 ```bash
-npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 142 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution, circling regression)
-npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
+# Verify build and regenerate all 4 distribution artifacts from src/
+npm run build
+
+# Run the complete test suite (146 tests)
+npm test
+
+# Launch the offline local dashboard
+npm start
+
+# Inspect synaptic weights, saliencies, and autopsy telemetry of a checkpoint
+npm run analyze -- checkpoints/slither_ml_brain_gen100.json
 ```
-
-### What the 142 tests cover
-
-| Area | What is asserted |
-| :--- | :--- |
-| **Tactical Combat** | Minkowski dynamic clearance & Behemoth evasion (`🛡️ DEFEND`); Anti-Encirclement Slit Breaching (`BREACH`); kinetic enemy boost velocity clearance expansion; Slipstream wake drafting; semantic object radar dampening on own body shield (`'self'`); Pocket Shield Defense against enemy head attacks; predator dynamic lead sprint (`⚔️ ATTACK`); defensive coil fortress (`🌀 COIL`); gapless offensive boa constrictor with Third-Party Perimeter Guard (`🐍 CONSTRICT`); post-kill corpse loot vacuum with "The Cross" perpendicular sweep (`🍖 VACUUM`); Angular Boost Gating (`R_turn = v / ω`); fleeing chase pellet lead interception; Emergency Escape Sprint; Apex dominance; death wall repulsion. |
-| **Flight Recorder & Autopsy** | 60-frame rolling FIFO buffer; automatic death root cause classification (9 emitted causes: `ARENA_WALL`, `ENCIRCLED_TRAP`, `HEAD_ON_RAM`, `HEAD_ON_JOUST`, `ATTACK_OVEREXTENDED`, `FLANK_CUTOFF`, `BODY_COLLISION`, `BOOST_STARVATION`, `SUDDEN_IMPACT`); pathfinder breadcrumb coordinate downsampling; stance duty cycle percentages; arena spatial zone distribution (center/midfield/perimeter); milestone growth timeline; checkpoint telemetry serialization. |
-| **Mass & Boost Economy** | No boosting for plain pellets; unsafe sprint rejection; Mass-ROI boost governor; length preservation. |
-| **Perception** | 1,200px corpse radar; dense 300-segment body sampling with zero ray tunneling; forward-only obstacle urgency. |
-| **Kill Recognition** | Vanished nearby enemies register confirmed kills, increment live HUD counter, and award dynamic mass-scaled combat bounty (+250 to +600 fitness based on victim scale ratio). |
-| **Neuroevolution** | Anti-stagnation mutation escalation; high-fitness annealed mutation; spawn-kill mulligan; soft teacher tuition blending; strict elitism; Consistency Gate; Silver Brain demotion & mutant candidate adoption; Uniform Crossover at stagnantGens >= 5. |
-| **Circling Regression** | `const→let` fix for `encirclementEscape` reassignment crash in `evaluate()` (mid-coil escape pivot, v5.10.8); v5.10.7 baseline parity for meanSignedTurn and netRevolutions across 5 seeds; crossover-child directional bias guard. |
-| **Gradient Check** | `trainStep` gradients verified against analytical float64 backpropagation across all 2,736 weights and 74 biases. |
-| **Artifact Drift** | All 4 distribution copies byte-identical; package/manifest versions synchronized. |
 
 ---
 
-## ⚠️ Terms of Service & Legal Disclaimer
+## Contributing
 
-> [!WARNING]
-> **Read Before Use:**
-> 1. **Academic & Research Scope:** This software is developed strictly as an educational proof-of-concept demonstrating neuroevolutionary optimization, imitation learning (online behavioral cloning), and kinematic obstacle avoidance in real-time continuous environments.
-> 2. **Terms of Service Violation:** Operating this software on live, public [Slither.io](https://slither.io) servers directly violates the official [Slither.io Terms of Service](https://slither.io/tos/), which explicitly prohibits:
->    - Developing or using bots, scripts, automation tools, or unauthorized clients.
->    - Intercepting, capturing, or modifying the behavior or memory of the game client.
->    - Emulating or interacting with the proprietary game protocol outside official software.
-> 3. **Account & Network Penalties:** The operators of Slither.io reserve the right to detect, throttle, block, or permanently ban IP addresses, devices, and connections associated with unauthorized automation.
-> 4. **No Affiliation or Warranty:** This project is independent, unofficial, and not affiliated with, endorsed by, or associated with Steve Howse, Lowtech Studios LLC, or Slither.io. It depends on internal, undocumented client runtime variables that may change or break at any time.
-> 5. **User Responsibility:** Any use of this code on live public servers is entirely at the user's sole discretion and risk. Contributors and maintainers assume zero liability for misuse, service interruptions, or account penalties.
+Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on code modularity, test requirements, and zero-dependency constraints.
 
+---
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
