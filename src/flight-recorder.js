@@ -96,8 +96,16 @@ export class FlightRecorder {
     }
 
     // 3. Spatial Zone Tracking (Arena radius grd is ~21,600)
-    const distFromOrigin = Math.hypot(snapshot.x || 0, snapshot.y || 0);
-    const normDist = Number.isFinite(snapshot.normWallDist) ? snapshot.normWallDist : (distFromOrigin / 21600);
+    let normDist;
+    if (Number.isFinite(snapshot.normWallDist)) {
+      normDist = snapshot.normWallDist;
+    } else {
+      const arenaRadius = 21600;
+      const isOffset = ((snapshot.x || 0) > arenaRadius * 0.5 || (snapshot.y || 0) > arenaRadius * 0.5);
+      const cx = isOffset ? arenaRadius : 0;
+      const cy = isOffset ? arenaRadius : 0;
+      normDist = Math.hypot((snapshot.x || 0) - cx, (snapshot.y || 0) - cy) / arenaRadius;
+    }
     if (normDist < 0.45) {
       this.zoneCounts.center++;
     } else if (normDist < 0.82) {
@@ -159,7 +167,13 @@ export class FlightRecorder {
         : (14 * estScale);
       const nearWall = (typeof last.normWallDist === 'number')
         ? (last.normWallDist >= 0.94 || (last.threatType === 'wall' && last.threatDist <= headRadius * 4.0))
-        : (Math.hypot(last.x || 0, last.y || 0) >= 21600 - 350);
+        : (() => {
+            const arenaRadius = 21600;
+            const isOffset = ((last.x || 0) > arenaRadius * 0.5 || (last.y || 0) > arenaRadius * 0.5);
+            const cx = isOffset ? arenaRadius : 0;
+            const cy = isOffset ? arenaRadius : 0;
+            return Math.hypot((last.x || 0) - cx, (last.y || 0) - cy) >= arenaRadius - 350;
+          })();
 
       if (nearWall) {
         cause = 'ARENA_WALL';
@@ -329,3 +343,4 @@ export class FlightRecorder {
     }
   }
 }
+

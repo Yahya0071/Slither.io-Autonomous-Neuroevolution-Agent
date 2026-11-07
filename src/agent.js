@@ -46,6 +46,7 @@ export class SlitherMLAgent {
     this.episodesPerGenome = 3;
     this.currentEpisode = 1;
     this.episodeFitnesses = [];
+    this.recentRollouts = [];
 
     this.candidatePending = false;
     this.candidateSource = null;
@@ -1105,11 +1106,27 @@ export class SlitherMLAgent {
       const sorted = [...this.episodeFitnesses].sort((a, b) => b - a);
       const aggregateFitness = (sorted[0] + sorted[1]) / 2;
       const meanFitness = this.episodeFitnesses.reduce((a, b) => a + b, 0) / this.episodeFitnesses.length;
+
+      // Track measured rollout distribution (rolling history of up to 20 rollouts)
+      this.recentRollouts.push(aggregateFitness);
+      if (this.recentRollouts.length > 20) this.recentRollouts.shift();
+
+      let measuredMedian = null;
+      let measuredQ3 = null;
+      let measuredFloor = null;
+      if (this.recentRollouts.length >= 2) {
+        const sortedHistory = [...this.recentRollouts].sort((a, b) => a - b);
+        measuredMedian = sortedHistory[Math.floor(sortedHistory.length / 2)];
+        const q3Idx = Math.min(sortedHistory.length - 1, Math.floor(sortedHistory.length * 0.75));
+        measuredQ3 = sortedHistory[q3Idx];
+        measuredFloor = Math.max(500, measuredQ3);
+      }
+
       const isTeacherCandidate = this.candidatePending && this.candidateSource === 'teacher';
       const origin = this.candidatePending ? 'teacher candidate' : 'mutant';
       const previousBest = this.bestFitness;
       // Two-Tier Tuition Preservation:
-      // Tier 2: Candidate achieves >= 35% of champion OR >= 5,000 points -> blend 20% into championBrain.
+      // Tier 2: Candidate achieves >= 35% of champion, >= 1,500 points, or >= 1.4x measured median -> blend 20% into championBrain.
       // Tier 3: Candidate achieved rollout under Tier 2 -> championBrain is protected, but 15% is blended
       //         into baseBrain (mutant breeding seed) so valuable human imitation learning never evaporates.
       const teacherWorthyOfChampBlend = isTeacherCandidate && (aggregateFitness >= previousBest * 0.35 || aggregateFitness >= 5000);
@@ -1153,11 +1170,17 @@ export class SlitherMLAgent {
         // (accelerating to 1.0% when stagnantGens >= 15) to prevent 1-in-1000 lucky spawn
         // outliers from permanently freezing evolution.
         // Adaptive Plateau Floor: Standard floor is 85% of peak fitness. When deep stagnation persists
-        // (>= 50 gens without a champion), ease to 75%, and at >= 60 gens ease to 70% to prevent
-        // infinite stagnation traps (e.g., Gen 134 at 67 stagnant gens).
+        // (>= 50 gens without a champion), ease to 75%, and at >= 60 gens ease to 70% or toward measured distribution
+        // to prevent infinite stagnation traps (e.g., Gen 134 at 67 stagnant gens or Gen 536 at 469 stagnant gens).
         this.allTimePeakFitness = Math.max(this.allTimePeakFitness || 0, this.bestFitness);
         const floorRatio = this.stagnantGens >= 60 ? 0.70 : (this.stagnantGens >= 50 ? 0.75 : 0.85);
-        const minBar = this.allTimePeakFitness * floorRatio;
+        let minBar = this.allTimePeakFitness * floorRatio;
+        if (this.stagnantGens >= 60) {
+          const targetFloor = measuredFloor !== null ? measuredFloor : 500;
+          if (minBar > targetFloor) {
+            minBar = Math.max(targetFloor, minBar * Math.pow(0.985, this.stagnantGens - 60));
+          }
+        }
         if (this.stagnantGens >= 15) {
           const decayed = Math.max(minBar, this.bestFitness * 0.990);
           console.log(`%c[SlitherML] 📉 Deep Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-1.0%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');

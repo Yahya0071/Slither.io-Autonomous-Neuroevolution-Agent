@@ -13,11 +13,24 @@ export function evaluateRollout({
   candidatePending,
   candidateSource,
   isAutonomousMutant,
-  inputCount = 32
+  inputCount = 32,
+  recentRollouts = []
 }) {
   const sorted = [...episodeFitnesses].sort((a, b) => b - a);
   const aggregateFitness = (sorted[0] + sorted[1]) / 2;
   const meanFitness = episodeFitnesses.reduce((a, b) => a + b, 0) / episodeFitnesses.length;
+
+  // Distribution metrics over recent measured autonomous rollouts
+  let measuredMedian = null;
+  let measuredQ3 = null;
+  let measuredFloor = null;
+  if (recentRollouts && recentRollouts.length >= 2) {
+    const recentSorted = [...recentRollouts].sort((a, b) => a - b);
+    measuredMedian = recentSorted[Math.floor(recentSorted.length / 2)];
+    const q3Idx = Math.min(recentSorted.length - 1, Math.floor(recentSorted.length * 0.75));
+    measuredQ3 = recentSorted[q3Idx];
+    measuredFloor = Math.max(500, measuredQ3);
+  }
 
   const isTeacherCandidate = candidatePending && candidateSource === 'teacher';
   const teacherWorthyOfChampBlend = isTeacherCandidate && (aggregateFitness >= previousBest * 0.35 || aggregateFitness >= 5000);
@@ -43,7 +56,17 @@ export function evaluateRollout({
   } else {
     nextStagnantGens = (stagnantGens || 0) + 1;
     const floorRatio = nextStagnantGens >= 60 ? 0.70 : (nextStagnantGens >= 50 ? 0.75 : 0.85);
-    const minBar = nextPeakFitness * floorRatio;
+    let minBar = nextPeakFitness * floorRatio;
+
+    // Measured Plateau Relief: If deep stagnation persists (>= 60 gens) and peak fitness sits
+    // far above achievable performance, ease minBar toward measured distribution or achievable floor.
+    if (nextStagnantGens >= 60) {
+      const targetFloor = measuredFloor !== null ? measuredFloor : 500;
+      if (minBar > targetFloor) {
+        minBar = Math.max(targetFloor, minBar * Math.pow(0.985, nextStagnantGens - 60));
+      }
+    }
+
     if (nextStagnantGens >= 15) {
       nextBestFitness = Math.max(minBar, previousBest * 0.990);
     } else if (nextStagnantGens >= 6) {
@@ -62,6 +85,9 @@ export function evaluateRollout({
     sorted,
     aggregateFitness,
     meanFitness,
+    measuredMedian,
+    measuredQ3,
+    measuredFloor,
     isNewChampion,
     passesConsistencyGate,
     mutantWorthyOfBlend,

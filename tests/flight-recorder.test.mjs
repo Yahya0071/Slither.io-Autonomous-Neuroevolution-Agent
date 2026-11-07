@@ -401,6 +401,25 @@ test('offset coordinates autopsy: snake in midfield (x: 33088, y: 35181, normWal
   assert.equal(autopsy.killerProfile.type, 'body');
 });
 
+test('zone tracking fallback: offset coordinates (center at 21600, 21600) correctly classify spatial zones without normWallDist', () => {
+  const harness = loadAgent();
+  const { FlightRecorder } = harness;
+  const rec = new FlightRecorder();
+
+  // True center of official Slither server (x: 21600, y: 21600, dist = 0, normDist = 0)
+  rec.recordFrame({ t: 1.0, x: 21600, y: 21600, stance: 'FORAGE' });
+  assert.equal(rec.zoneCounts.center, 1, 'center of offset world must be classified as center zone');
+  assert.equal(rec.zoneCounts.perimeter, 0);
+
+  // Midfield point (x: 34560, y: 21600, dist = 12960px, normDist = 0.60)
+  rec.recordFrame({ t: 2.0, x: 34560, y: 21600, stance: 'DEFEND' });
+  assert.equal(rec.zoneCounts.midfield, 1, 'midfield of offset world must be classified as midfield zone');
+
+  // True perimeter point (x: 41000, y: 21600, dist = 19400px, normDist = ~0.898)
+  rec.recordFrame({ t: 3.0, x: 41000, y: 21600, stance: 'DEFEND' });
+  assert.equal(rec.zoneCounts.perimeter, 1, 'boundary of offset world must be classified as perimeter zone');
+});
+
 test('killerProfile never reports type: self on self-body shielding', () => {
   const harness = loadAgent();
   const agent = harness.newAgent();

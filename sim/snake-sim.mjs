@@ -108,7 +108,9 @@ export function simulate(opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   const rand = mulberry32(o.seed);
 
-  const setup = o.agent ? { agent: o.agent, clock: o.clock } : makeAgent(o.seed);
+  const setup = o.agent
+    ? { agent: o.agent, clock: o.clock || { t: 0, now() { return this.t; } } }
+    : makeAgent(o.seed);
   const { agent, clock } = setup;
 
   const foods = placeFood(rand, o);
@@ -221,5 +223,53 @@ export function simulate(opts = {}) {
     pointedAtFood: foodFrames > 0 ? pointedAtFoodFrames / foodFrames : null,
     meanNearestFoodDist: foodFrames > 0 ? nearestFoodDistSum / foodFrames : null,
     foodsLeft: foods.length,
+  };
+}
+
+/**
+ * Evaluate an agent across a fixed seed schedule to produce robust distribution metrics
+ * (median, IQR, Q1, Q3, mean, max for score/length and survival).
+ * Replaces single-run champion fitness with deterministic distribution statistics.
+ */
+export function evaluateDistribution(agentOrGenome, opts = {}) {
+  const seedCount = opts.seedCount || 50;
+  const startSeed = opts.startSeed || 1;
+  const scores = [];
+  const survivals = [];
+  const pellets = [];
+  const boostDuties = [];
+
+  for (let i = 0; i < seedCount; i++) {
+    const seed = startSeed + i;
+    const res = simulate({
+      ...opts,
+      seed,
+      agent: opts.agent || (agentOrGenome && typeof agentOrGenome.evaluate === 'function' ? agentOrGenome : undefined),
+    });
+    scores.push(res.finalScore);
+    survivals.push(res.seconds);
+    pellets.push(res.pelletsEaten);
+    boostDuties.push(res.boostDuty);
+  }
+
+  function getQuantiles(arr) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const n = sorted.length;
+    const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
+    const q1 = sorted[Math.floor(n * 0.25)];
+    const q3 = sorted[Math.floor(n * 0.75)];
+    const iqr = q3 - q1;
+    const mean = arr.reduce((a, b) => a + b, 0) / n;
+    const max = sorted[n - 1];
+    const min = sorted[0];
+    return { median, q1, q3, iqr, mean, max, min };
+  }
+
+  return {
+    seedCount,
+    scores: getQuantiles(scores),
+    survivals: getQuantiles(survivals),
+    pellets: getQuantiles(pellets),
+    boostDuties: getQuantiles(boostDuties)
   };
 }
