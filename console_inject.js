@@ -338,7 +338,6 @@
 
       // Stance Frame Counters
       this.stanceCounts = {
-        WANDER: 0,
         FORAGE: 0,
         ATTACK: 0,
         COIL: 0,
@@ -714,7 +713,7 @@
       this.foodSteerEma = 0;           // smoothed foraging command (damps target flip-flop)
       this.lastDecisionTime = performance.now();
 
-      // Combat & Tactical Stance State Machine ('FORAGE' | 'DEFEND' | 'ATTACK' | 'COIL' | 'CONSTRICT' | 'VACUUM')
+      // Combat & Tactical Stance State Machine ('FORAGE' | 'DEFEND' | 'ATTACK' | 'COIL' | 'CONSTRICT' | 'VACUUM' | 'HUNT')
       this.combatStance = 'FORAGE';
       this.attackTarget = null;
       this.cutOffThreat = null;

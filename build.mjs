@@ -12,9 +12,28 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const SOURCE = 'console_inject.js';
-const source = readFileSync(SOURCE, 'utf8');
+let source = readFileSync(SOURCE, 'utf8');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const version = pkg.version;
+
+// Ensure extension manifest version is generated from package.json
+const MANIFEST = 'extension/manifest.json';
+const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+if (manifest.version !== version) {
+  manifest.version = version;
+  writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+}
+
+// Synchronize version strings in console_inject.js from package.json
+const updatedSource = source
+  .replace(/(Hybrid Neuroevolution \+ Imitation Learning Engine v)\d+\.\d+\.\d+/, `$1${version}`)
+  .replace(/(Initializing Hybrid Neuroevolution \+ Imitation Learning Agent v)\d+\.\d+\.\d+/, `$1${version}`)
+  .replace(/(SlitherML v)\d+\.\d+\.\d+/, `$1${version}`);
+
+if (updatedSource !== source) {
+  source = updatedSource;
+  writeFileSync(SOURCE, source, 'utf8');
+}
 
 if (source.includes('</script>')) {
   throw new Error('console_inject.js contains a literal </script>, which cannot be inlined into HTML.');
