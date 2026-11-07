@@ -36,7 +36,7 @@ Synthesized from the best breakthroughs across the 4 most prominent open-source 
 | **[`quick_start.html`](./quick_start.html)** | Local launcher dashboard with 1-click script copy buttons. Its two inlined copies are **generated**. |
 | **[`build.mjs`](./build.mjs)** | Regenerates every distribution artifact from `console_inject.js` and verifies they match. |
 | **[`sim/analyze_checkpoint.mjs`](./sim/analyze_checkpoint.mjs)** | Diagnostic CLI tool (`npm run analyze <checkpoint.json>`) to inspect synaptic weights, input saliencies, and flight recorder telemetry. |
-| **[`tests/`](./tests)** | Node test suite: 142 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover, circling regression). |
+| **[`tests/`](./tests)** | Node test suite: 145 unit and behavioural tests (kinematics, combat stances, flight recorder autopsy, anti-encirclement slit breach, failure-trauma filter, kinetic clearance, slipstream drafting, semantic radar, pocket defense, evasion latch, traffic corridors, silver brain crossover, circling regression, multi-threat anti-chatter). |
 
 > ⚠️ Only edit `console_inject.js`. The other copies are generated — run `npm run build`, then `npm test` to confirm they match.
 
@@ -146,7 +146,7 @@ The agent dynamically evaluates surrounding game state, calculates relative scal
   - **Fast Evolutionary Programming (Cauchy Lévy Flights & Xavier Spectral Scaling)**: Mutations draw from a hybrid distribution (85% Gaussian micro-tuning + 15% heavy-tailed Cauchy perturbations `tan(π(U - 0.5))`). Because Cauchy distributions have heavy polynomial tails, genomes execute occasional Lévy flights over fitness barriers, provably escaping local minima plateaus. Mutation strengths scale inversely with layer fan-in (`σ_l = σ_0 × √(24 / n_in)`) to preserve activation variances across deep layers.
   - **Adaptive Plateau Relief & Multi-Tier Floor**: If evolution stagnates for ≥ 6 consecutive generations without a new champion, gentle 0.5% plateau relief eases the bar (`bestFitness × 0.995`); at ≥ 15 generations, relief accelerates to 1.0% (`bestFitness × 0.990`). `allTimePeakFitness` is persisted across sessions and page reloads. To prevent permanent evolution freezes in high-generation lineages, an adaptive plateau floor bounds the decay based on stagnation depth: standard floor is **85%** (`stagnantGens < 50`), easing to **75%** during deep stagnation (`50 ≤ stagnantGens < 60`), and to **70%** during extreme stagnation (`stagnantGens ≥ 60`).
   - **Spawn Protection**: Rollouts with fewer than 2 valid episodes due to mulligans automatically extend rather than granting unearned generation advances.
-- **Autonomous Mutant Soft Trait Retention (Polyak Blending)**: When an autonomous mutant demonstrates solid performance by achieving an aggregate score ≥ 75% of the champion (`Aggregate ≥ 0.75 × previousBest`), 15% of its weights are softly blended into the breeding template (`baseBrain`) for subsequent generations (`W_seed = 0.85 × W_champ + 0.15 × W_mutant`), accelerating evolutionary search while keeping `championBrain` strictly untouched.
+- **Autonomous Mutant Soft Trait Retention (Polyak Blending)**: When an autonomous mutant demonstrates solid performance by achieving an aggregate score ≥ 40% of the champion (`Aggregate ≥ 0.40 × previousBest`), 15% of its weights are softly blended into the breeding template (`baseBrain`) for subsequent generations (`W_seed = 0.85 × W_champ + 0.15 × W_mutant`), accelerating evolutionary search while keeping `championBrain` strictly untouched. Also qualifies the mutant as a silver candidate for uniform crossover recombination when no displaced champion is available.
 
 ### 2. Teacher Mode (Online Imitation Learning) — Press `[T]`
 - **How it works**: Press `[T]` or `[B]` at any point to take manual control. Starting Teacher Mode initializes tuition from the pristine `championBrain` rather than an exploration mutant.
@@ -180,15 +180,15 @@ Requires Node.js ≥ 22.8. Zero external dependencies.
 
 ```bash
 npm run build   # regenerate the 4 distribution artifacts from console_inject.js
-npm test        # 142 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution, circling regression)
+npm test        # 145 unit and behavioural tests (flight simulator, combat stances, flight recorder, neuroevolution, circling regression, multi-threat anti-chatter)
 npm run analyze # inspect newest checkpoint weights, saliencies, and autopsy telemetry
 ```
 
-### What the 142 tests cover
+### What the 145 tests cover
 
 | Area | What is asserted |
 | :--- | :--- |
-| **Tactical Combat** | Minkowski dynamic clearance & Behemoth evasion (`🛡️ DEFEND`); Anti-Encirclement Slit Breaching (`BREACH`); kinetic enemy boost velocity clearance expansion; Slipstream wake drafting; semantic object radar dampening on own body shield (`'self'`); Pocket Shield Defense against enemy head attacks; predator dynamic lead sprint (`⚔️ ATTACK`); defensive coil fortress (`🌀 COIL`); gapless offensive boa constrictor with Third-Party Perimeter Guard (`🐍 CONSTRICT`); post-kill corpse loot vacuum with "The Cross" perpendicular sweep (`🍖 VACUUM`); Angular Boost Gating (`R_turn = v / ω`); fleeing chase pellet lead interception; Emergency Escape Sprint; Apex dominance; death wall repulsion. |
+| **Tactical Combat** | Minkowski dynamic clearance & Behemoth evasion (`🛡️ DEFEND`); Anti-Encirclement Slit Breaching (`BREACH`); kinetic enemy boost velocity clearance expansion; Slipstream wake drafting; semantic object radar dampening on own body shield (`'self'`); Pocket Shield Defense against enemy head attacks; predator dynamic lead sprint (`⚔️ ATTACK`); defensive coil fortress (`🌀 COIL`); gapless offensive boa constrictor with Third-Party Perimeter Guard (`🐍 CONSTRICT`); post-kill corpse loot vacuum with "The Cross" perpendicular sweep (`🍖 VACUUM`); Angular Boost Gating (`R_turn = v / ω`); fleeing chase pellet lead interception; Emergency Escape Sprint; rear-corridor branch-cut turn lock; high-traffic corridor escape sprint; Apex dominance; death wall repulsion. |
 | **Flight Recorder & Autopsy** | 60-frame rolling FIFO buffer; automatic death root cause classification (9 emitted causes: `ARENA_WALL`, `ENCIRCLED_TRAP`, `HEAD_ON_RAM`, `HEAD_ON_JOUST`, `ATTACK_OVEREXTENDED`, `FLANK_CUTOFF`, `BODY_COLLISION`, `BOOST_STARVATION`, `SUDDEN_IMPACT`); pathfinder breadcrumb coordinate downsampling; stance duty cycle percentages; arena spatial zone distribution (center/midfield/perimeter); milestone growth timeline; checkpoint telemetry serialization. |
 | **Mass & Boost Economy** | No boosting for plain pellets; unsafe sprint rejection; Mass-ROI boost governor; length preservation. |
 | **Perception** | 1,200px corpse radar; dense 300-segment body sampling with zero ray tunneling; forward-only obstacle urgency. |

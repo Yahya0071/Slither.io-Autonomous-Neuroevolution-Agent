@@ -1381,3 +1381,100 @@ test('snake defensive coil: coils at score >= 80 when pinched without exit (v5.1
   const decision = agent.evaluate(snake, [], [], []);
   assert.equal(decision.stance, 'COIL', 'snake with score 90, scale>=1.08, pinched, no corridor must enter COIL');
 });
+
+test('multi-threat evasion: rear corridor branch-cut lock prevents left-right chatter when exit is behind snake', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+
+  const turns = [];
+  // 6 consecutive frames where the exit corridor is nearly directly behind (error fluctuating around PI)
+  for (let f = 0; f < 6; f++) {
+    clock.t += 1000 / 60;
+    const isEven = f % 2 === 0;
+    agent._extractInputs = () => {
+      const inputs = new Float32Array(32);
+      inputs[31] = 0.60; // surrounded by traffic
+      inputs[8] = 0.85;  // blocked in front
+      return {
+        inputs,
+        minObstacleDist: 40,
+        frontObstacleDist: 40,
+        frontThreatScale: 1.2,
+        nearestThreatScale: 1.2,
+        leftClearance: isEven ? 60 : 55,
+        rightClearance: isEven ? 55 : 60,
+        forwardObstacleDanger: true,
+        normWallDist: 0.2,
+        diffCenterAngle: 0,
+        headRadius: 14,
+        currentAng: 0,
+        currentScore: 100,
+        cutOffThreat: null,
+        attackCandidate: null,
+        constrictCandidate: null,
+        closestObstacleType: 'body',
+        frontObstacleType: 'body',
+        selfShieldSide: 0,
+        encirclementEscape: null,
+        slipstreamTarget: null,
+        huntCandidate: null,
+        maxCorridorDist: 350,
+        // Exit is at +-pi (behind the snake) — alternating slightly above and below pi
+        bestCorridorAngle: isEven ? Math.PI - 0.05 : -Math.PI + 0.05
+      };
+    };
+
+    const d = agent.evaluate(snake, [], [], []);
+    turns.push(Math.sign(agent.targetAngle));
+  }
+
+  // All 6 frames must maintain a consistent turn direction (no left/right chatter)
+  assert.equal(turns.length, 6);
+  const initialSign = turns[0];
+  assert.notEqual(initialSign, 0, 'initial turn sign must be non-zero');
+  for (let i = 1; i < turns.length; i++) {
+    assert.equal(turns[i], initialSign, `frame ${i} must maintain turn sign ${initialSign}, got ${turns[i]}`);
+  }
+});
+
+test('multi-threat evasion: boosts to sprint through open corridor when surrounded in high traffic', () => {
+  const { agent, clock } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+
+  agent._extractInputs = () => {
+    const inputs = new Float32Array(32);
+    inputs[31] = 0.60; // surrounded by traffic
+    inputs[8] = 0.75;  // danger present
+    return {
+      inputs,
+      minObstacleDist: 50,
+      frontObstacleDist: 50,
+      frontThreatScale: 1.2,
+      nearestThreatScale: 1.2,
+      leftClearance: 60,
+      rightClearance: 60,
+      forwardObstacleDanger: true,
+      normWallDist: 0.2,
+      diffCenterAngle: 0,
+      headRadius: 14,
+      currentAng: 0,
+      currentScore: 100,
+      cutOffThreat: null,
+      attackCandidate: null,
+      constrictCandidate: null,
+      closestObstacleType: 'body',
+      frontObstacleType: 'body',
+      selfShieldSide: 0,
+      encirclementEscape: null,
+      slipstreamTarget: null,
+      huntCandidate: null,
+      maxCorridorDist: 350,
+      bestCorridorAngle: 0.15 // Aligned with forward-right corridor (< 0.65 rad)
+    };
+  };
+
+  const decision = agent.evaluate(snake, [], [], []);
+  assert.equal(decision.stance, 'DEFEND');
+  assert.equal(decision.isBoosting, true, 'must boost to sprint through open corridor when surrounded');
+});
+

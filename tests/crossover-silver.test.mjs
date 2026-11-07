@@ -320,7 +320,7 @@ test('crossover breeding: NOT used when silverBrain is null even when stagnantGe
 // ---------------------------------------------------------------------------
 // 11. Stalled checkpoint with no silver gets one from a qualifying mutant
 // ---------------------------------------------------------------------------
-test('silver candidate: stalled checkpoint with no silver gets one from qualifying mutant (>= 75%)', () => {
+test('silver candidate: stalled checkpoint with no silver gets one from qualifying mutant (>= 40%)', () => {
   // Simulate stalled checkpoint like Gen 337 (stagnantGens: 270, silverBrain: null)
   const { agent, NeuralNetwork, logs } = withChampion({ fitness: 30000, stagnantGens: 270 });
   assert.equal(agent.silverBrain, null, 'initially no silver brain');
@@ -452,5 +452,35 @@ test('silver candidate: round-trips cleanly through checkpoint export/import', (
   const restoredFP = fingerprint(harness2.NeuralNetwork.fromJSON(agent2.silverBrain.export(), INPUTS));
   assert.ok(sameGenome(restoredFP, silverFP), 'restored candidate matches original');
 });
+
+// ---------------------------------------------------------------------------
+// 15. Mutant scoring between 40% and 75% qualifies as silver candidate
+// ---------------------------------------------------------------------------
+test('silver candidate: mutant scoring 45% (>= 40%) qualifies as silver candidate, while 35% does not', () => {
+  const { agent, NeuralNetwork } = withChampion({ fitness: 30000, stagnantGens: 10 });
+  assert.equal(agent.silverBrain, null);
+
+  // Life 1..3: score 10,500 (35% < 40%) -> must NOT qualify as silver candidate
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 10500;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+  assert.equal(agent.silverBrain, null, '35% mutant must not be adopted as silver');
+
+  // Next mutant: scores 13,500 (45% >= 40%) -> MUST qualify as silver candidate
+  const qualifyingFP = fingerprint(NeuralNetwork.fromJSON(agent.brain.export(), INPUTS));
+  for (let ep = 0; ep < EPISODES; ep++) {
+    agent.fitness = 13500;
+    agent.survivalTime = 50;
+    agent.onDeath(false);
+  }
+  assert.ok(agent.silverBrain !== null, '45% mutant must be adopted as silver candidate');
+  assert.equal(agent.silverSource, 'mutant');
+  assert.equal(agent.silverFitness, 13500);
+  const silverFP = fingerprint(NeuralNetwork.fromJSON(agent.silverBrain.export(), INPUTS));
+  assert.ok(sameGenome(silverFP, qualifyingFP), 'silverBrain matches 45% qualifying mutant');
+});
+
 
 
