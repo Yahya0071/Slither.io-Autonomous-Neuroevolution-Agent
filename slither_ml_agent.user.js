@@ -2117,7 +2117,7 @@
 
       // Pre-compute primary food target once for Stance Arbiter, Steering, and Boost Governor
       const foodTarget = this._pickFoodTarget(currentAng, snake.xx, snake.yy, snakes);
-      const richCorpseNearby = Boolean(foodTarget && (foodTarget.isCorpse || foodTarget.clusterCount >= 2) && foodTarget.dist < 850);
+      const richCorpseNearby = Boolean(foodTarget && foodTarget.isCorpse && foodTarget.clusterCount >= 3 && foodTarget.dist < 850);
 
       this.closestObstacleType = closestObstacleType;
       this.frontObstacleType = frontObstacleType;

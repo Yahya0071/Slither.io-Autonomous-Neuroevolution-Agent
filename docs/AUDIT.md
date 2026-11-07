@@ -50,7 +50,6 @@ Comprehensive audit comparing `console_inject.js` against `README.md`, `package.
 
 ## 5. Test Counts
 
-- **Actual test suite count**: 145 tests passing (`node --test`).
-- **`README.md` references**: lines 68, 183, 187 all state 145 tests.
-- **`docs/BASELINE.md`**: 145 tests.
+- **Actual test suite count**: 146 tests passing (`node --test`).
+- **`README.md` references**: lines 39, 183, 187 all state 146 tests.
 - Aligned.

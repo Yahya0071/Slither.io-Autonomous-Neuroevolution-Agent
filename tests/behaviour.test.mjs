@@ -1242,6 +1242,26 @@ test('contested-loot scavenger caution: vetos boost and offsets away from rival 
   assert.equal(decision.isBoosting, false, 'must veto boost when rival is contesting the corpse loot');
 });
 
+test('vacuum stance gating: single isolated pellet (even sz >= 6.5) stays in FORAGE; dense cluster triggers VACUUM', () => {
+  const { agent } = makeAgent(1);
+  const snake = { id: 'me', xx: 0, yy: 0, eang: 0, sc: 1.0, sp: 5.9, sct: 100, pts: [] };
+
+  // 1. Single isolated large pellet (e.g. glowing pellet or boost trail) -> must NOT trigger VACUUM
+  const singlePellet = [{ xx: 100, yy: 0, sz: 7.0, eaten: false, dying: false }];
+  const resSingle = agent.evaluate(snake, [], singlePellet, []);
+  assert.equal(resSingle.stance, 'FORAGE', 'single isolated pellet must stay in FORAGE stance');
+
+  // 2. Dense corpse cluster (>= 3 corpse pellets nearby) -> must trigger VACUUM
+  const denseCluster = [
+    { xx: 100, yy: 0, sz: 7.0, eaten: false, dying: false },
+    { xx: 110, yy: 10, sz: 7.0, eaten: false, dying: false },
+    { xx: 105, yy: -10, sz: 7.0, eaten: false, dying: false },
+    { xx: 95, yy: 5, sz: 7.0, eaten: false, dying: false },
+  ];
+  const resCluster = agent.evaluate(snake, [], denseCluster, []);
+  assert.equal(resCluster.stance, 'VACUUM', 'dense corpse cluster must trigger VACUUM stance');
+});
+
 // ---------------------------------------------------------------------------
 // 11. Directional Evasion Latch & Traffic Corridor Vision (v5.10.5)
 // ---------------------------------------------------------------------------
