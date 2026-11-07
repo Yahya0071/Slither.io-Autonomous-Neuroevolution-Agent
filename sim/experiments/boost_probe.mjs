@@ -1,6 +1,6 @@
-import { makeAgent } from './snake-sim.mjs';
+// Experiment: Drives the boost governor with isolated synthetic states to measure individual gating duty cycles.
+import { makeAgent } from '../snake-sim.mjs';
 
-// Drive the boost governor with synthetic states so each gate can be isolated.
 function duty({ score = 200, peak = 0, frontBlocked = false, congested = false, target = true, seconds = 40 }) {
   const { agent, clock } = makeAgent(1);
   const inputs = new Float32Array(32);
@@ -22,7 +22,6 @@ function duty({ score = 200, peak = 0, frontBlocked = false, congested = false, 
   });
 
   agent.peakLength = peak;
-  // a dead-snake drop 200 units straight ahead (value 8 => worth sprinting)
   agent.detectedFoods = target ? [{ dx: 200, dy: 0, dist: 200, sz: 20, isPrey: false }] : [];
 
   let boosting = 0;
@@ -48,4 +47,3 @@ console.log('boost duty cycle under the governor:\n');
 for (const c of cases) {
   console.log(`  ${c.label.padEnd(38)} ${duty(c.args).toFixed(1).padStart(6)} %`);
 }
-console.log('\nmax possible duty = burst(1.2s) / (burst + rest 2.0s) = 37.5% while a target persists');

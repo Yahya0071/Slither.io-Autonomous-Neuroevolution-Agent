@@ -2,13 +2,14 @@
     "name":  "slither-ml-agent",
     "version": "5.10.8",
     "description":  "Autonomous Neuroevolution Machine Learning Agent with Forensic Deductor \u0026 Pathfinder for official Slither.io",
+    "author": "Yahya0071",
     "private":  true,
     "type":  "module",
     "scripts":  {
                     "build":  "node build.mjs",
                     "test":  "node --test",
                     "analyze":  "node sim/analyze_checkpoint.mjs",
-                    "start":  "start quick_start.html"
+                    "start":  "node scripts/open_dashboard.mjs"
                 },
     "engines":  {
                     "node":  "\u003e=22.8"

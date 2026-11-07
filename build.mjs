@@ -25,7 +25,7 @@ const USCRIPT_HEADER = `// ==UserScript==
 // @namespace    https://slither.io/
 // @version      ${version}
 // @description  32-input Hybrid Neuroevolution + Online Imitation Learning AI for Slither.io. 16 proximity rays, 8 food sectors, self-collision detection, trajectory prediction, and teacher-mode backpropagation whose lessons must win an autonomous 3-life evaluation before being saved.
-// @author       DeepMind Antigravity AI
+// @author       ${pkg.author || 'Yahya0071'}
 // @match        *://slither.io/*
 // @match        *://slither.com/io*
 // @match        *://*.slither.io/*

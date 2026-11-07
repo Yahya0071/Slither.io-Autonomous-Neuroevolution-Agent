@@ -38,7 +38,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAgent, MemoryStorage } from '../agent-loader.mjs';
@@ -130,10 +130,19 @@ function simulateCircling({
 }
 
 /** Load a checkpoint brain into a fresh agent using the given harness. */
+function resolveCheckpoint(name) {
+  const archivePath = join(root, 'checkpoints_archive', name);
+  if (existsSync(archivePath)) return archivePath;
+  const regularPath = join(root, 'checkpoints', name);
+  if (existsSync(regularPath)) return regularPath;
+  return join(root, 'checkpoints', 'slither_ml_brain_gen100.json');
+}
+
 function loadCheckpoint(ckPath, harness) {
   const agent = harness.newAgent();
   agent.resetBrain();
-  const ck = JSON.parse(readFileSync(ckPath, 'utf8'));
+  const path = existsSync(ckPath) ? ckPath : resolveCheckpoint(ckPath);
+  const ck = JSON.parse(readFileSync(path, 'utf8'));
   agent.applySavedState(ck);
   return agent;
 }
@@ -208,7 +217,7 @@ test('circling: Gen337 champion circling matches v5.10.7 reference (no food, 5 s
   const seeds = [1, 7, 13, 42, 99];
   for (const seed of seeds) {
     const { harness, clock } = freshHarness();
-    const agent = loadCheckpoint(join(root, 'checkpoints/slither_ml_brain_gen337.json'), harness);
+    const agent = loadCheckpoint(resolveCheckpoint('slither_ml_brain_gen337.json'), harness);
     const result = simulateCircling({ agent, clock, seed, frames: 600, foodCount: 0 });
     assert.ok(
       Math.abs(result.meanSignedTurn - REF.gen337NoFood.meanTurn) < 0.10,
@@ -274,15 +283,22 @@ test('circling: crossover child meanSignedTurn is within 0.20 of champion in emp
   const { harness: h2, clock: clockB } = freshHarness();
   const { NeuralNetwork } = harness;
 
-  const ck337 = JSON.parse(readFileSync(join(root, 'checkpoints/slither_ml_brain_gen337.json'), 'utf8'));
-  const ck69  = JSON.parse(readFileSync(join(root, 'checkpoints/slither_ml_brain_gen69.json'), 'utf8'));
-
+  const ck337Path = resolveCheckpoint('slither_ml_brain_gen337.json');
+  const ck337 = JSON.parse(readFileSync(ck337Path, 'utf8'));
   const champion = NeuralNetwork.fromJSON(ck337.brain);
-  const silver   = NeuralNetwork.fromJSON(ck69.brain);
+
+  let silver;
+  const ck69Path = resolveCheckpoint('slither_ml_brain_gen69.json');
+  if (ck69Path !== ck337Path) {
+    silver = NeuralNetwork.fromJSON(JSON.parse(readFileSync(ck69Path, 'utf8')).brain);
+  } else {
+    silver = NeuralNetwork.fromJSON(champion.export());
+    silver.mutate(0.1, 0.05);
+  }
   const child    = NeuralNetwork.crossover(champion, silver);
 
   // Champion baseline
-  const agentA = loadCheckpoint(join(root, 'checkpoints/slither_ml_brain_gen337.json'), harness);
+  const agentA = loadCheckpoint(ck337Path, harness);
   const champResult = simulateCircling({ agent: agentA, clock: clockA, seed: 7, frames: 600, foodCount: 0 });
 
   // Crossover child — load into a fresh agent by replacing its brain

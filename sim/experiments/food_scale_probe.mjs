@@ -1,7 +1,7 @@
-﻿import { makeAgent } from './snake-sim.mjs';
+// Experiment: Tests food sector radar input scaling across varied pellet densities.
+import { makeAgent } from '../snake-sim.mjs';
 const { agent, clock } = makeAgent(3);
 for (const n of [200, 2000, 8000]) {
-  // uniform pellets in a 2600-radius disc, snake at origin
   let seed = 42;
   const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const foods = Array.from({ length: n }, () => {

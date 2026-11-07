@@ -1,4 +1,5 @@
-﻿import { makeAgent } from './snake-sim.mjs';
+// Experiment: Measures raw neural boost probability distribution over dense food field frames.
+import { makeAgent } from '../snake-sim.mjs';
 const { agent, clock } = makeAgent(5);
 let seed = 99;
 const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);

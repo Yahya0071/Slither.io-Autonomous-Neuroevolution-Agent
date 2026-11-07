@@ -1,7 +1,7 @@
-import { makeAgent } from './snake-sim.mjs';
+// Experiment: Traces kinematic approach and food capture efficiency within a forward 30-degree cone.
+import { makeAgent } from '../snake-sim.mjs';
 
 const { agent, clock } = makeAgent(11);
-// food in a +/-30 deg cone ahead
 let seed = 11 * 7;
 const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 const foods = Array.from({ length: 300 }, () => {
@@ -21,7 +21,6 @@ for (let f = 0; f < 90; f++) {
   snake.eang += Math.max(-0.075, Math.min(0.075, diff));
   snake.xx += Math.cos(snake.eang) * 354 / 60;
   snake.yy += Math.sin(snake.eang) * 354 / 60;
-
 
   const headR = 14 * snake.sc;
   let ateThis = 0;
@@ -51,4 +50,3 @@ for (let f = 0; f < 90; f++) {
     );
   }
 }
-console.log(`\neaten total: ${eaten} in ${(90 / 60).toFixed(1)}s`);

@@ -1,4 +1,5 @@
-import { makeAgent } from './snake-sim.mjs';
+// Experiment: Probes step-by-step steering inputs and network activations toward an offset clump of pellets.
+import { makeAgent } from '../snake-sim.mjs';
 
 const { agent, clock } = makeAgent(7);
 const foods = Array.from({ length: 40 }, (_, i) => ({ xx: 300 + (i % 8) * 40, yy: -100 + Math.floor(i / 8) * 50, sz: 4 }));
