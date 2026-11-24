@@ -174,6 +174,9 @@ export class SlitherMLAgent {
     this.generation = typeof parsed.generation === 'number' ? parsed.generation : 1;
     this.currentEpisode = typeof parsed.currentEpisode === 'number' ? parsed.currentEpisode : 1;
     this.episodeFitnesses = Array.isArray(parsed.episodeFitnesses) ? [...parsed.episodeFitnesses] : [];
+    this.recentRollouts = Array.isArray(parsed.recentRollouts)
+      ? parsed.recentRollouts.filter(n => typeof n === 'number' && Number.isFinite(n)).slice(-20)
+      : [];
     this.candidatePending = Boolean(parsed.candidatePending);
     this.candidateSource = parsed.candidateSource || null;
     this.kills = typeof parsed.kills === 'number' ? parsed.kills : 0;
@@ -316,6 +319,7 @@ export class SlitherMLAgent {
     this.generation = 1;
     this.currentEpisode = 1;
     this.episodeFitnesses = [];
+    this.recentRollouts = [];
     this.bestFitness = 0;
     this.fitness = 0;
     this.survivalTime = 0;
@@ -1103,56 +1107,44 @@ export class SlitherMLAgent {
         return;
       }
 
-      const sorted = [...this.episodeFitnesses].sort((a, b) => b - a);
-      const aggregateFitness = (sorted[0] + sorted[1]) / 2;
-      const meanFitness = this.episodeFitnesses.reduce((a, b) => a + b, 0) / this.episodeFitnesses.length;
+      const previousBest = this.bestFitness;
+      const origin = this.candidatePending ? 'teacher candidate' : 'mutant';
+      const evalResult = evaluateRollout({
+        episodeFitnesses: this.episodeFitnesses,
+        previousBest,
+        allTimePeakFitness: this.allTimePeakFitness,
+        stagnantGens: this.stagnantGens,
+        candidatePending: this.candidatePending,
+        candidateSource: this.candidateSource,
+        isAutonomousMutant: !this.candidatePending,
+        inputCount: this.inputCount,
+        recentRollouts: this.recentRollouts
+      });
+
+      const {
+        sorted,
+        aggregateFitness,
+        meanFitness,
+        isNewChampion,
+        passesConsistencyGate,
+        mutantWorthyOfBlend,
+        isProdigyRun,
+        teacherWorthyOfChampBlend,
+        teacherWorthyOfBreedingBlend,
+        nextBestFitness,
+        nextPeakFitness,
+        nextStagnantGens,
+        silverUpdate
+      } = evalResult;
 
       // Track measured rollout distribution (rolling history of up to 20 rollouts)
       this.recentRollouts.push(aggregateFitness);
       if (this.recentRollouts.length > 20) this.recentRollouts.shift();
 
-      let measuredMedian = null;
-      let measuredQ3 = null;
-      let measuredFloor = null;
-      if (this.recentRollouts.length >= 2) {
-        const sortedHistory = [...this.recentRollouts].sort((a, b) => a - b);
-        measuredMedian = sortedHistory[Math.floor(sortedHistory.length / 2)];
-        const q3Idx = Math.min(sortedHistory.length - 1, Math.floor(sortedHistory.length * 0.75));
-        measuredQ3 = sortedHistory[q3Idx];
-        measuredFloor = Math.max(500, measuredQ3);
-      }
-
-      const isTeacherCandidate = this.candidatePending && this.candidateSource === 'teacher';
-      const origin = this.candidatePending ? 'teacher candidate' : 'mutant';
-      const previousBest = this.bestFitness;
-      // Two-Tier Tuition Preservation:
-      // Tier 2: Candidate achieves >= 35% of champion, >= 1,500 points, or >= 1.4x measured median -> blend 20% into championBrain.
-      // Tier 3: Candidate achieved rollout under Tier 2 -> championBrain is protected, but 15% is blended
-      //         into baseBrain (mutant breeding seed) so valuable human imitation learning never evaporates.
-      const teacherWorthyOfChampBlend = isTeacherCandidate && (aggregateFitness >= previousBest * 0.35 || aggregateFitness >= 5000);
-      const teacherWorthyOfBreedingBlend = isTeacherCandidate && !teacherWorthyOfChampBlend && aggregateFitness <= previousBest;
-      const isAutonomousMutant = !this.candidatePending;
-
-      // Consistency gate: To prevent 1 lucky fluke run from crowning an erratic genome,
-      // the median run (sorted[1]) must be at least 40% of previousBest.
-      const passesConsistencyGate = sorted[1] >= previousBest * 0.40;
-
-      // Mutant soft trait retention: autonomous mutants scoring >= 40% of previousBest
-      // blend 15% weights into the baseBrain breeding seed (championBrain untouched).
-      const mutantWorthyOfBlend = isAutonomousMutant && aggregateFitness <= previousBest && aggregateFitness >= previousBest * 0.40;
-
-      // Prodigy Single-Run Rule: An autonomous mutant that achieved a heroic single life
-      // (>= 22,000 points or >= 55% of all-time peak fitness) but missed the 40% aggregate bar
-      // due to bad spawn-luck on remaining runs should NOT have its breakthrough weights discarded.
-      // Blends 20% of its weights into the breeding template.
-      const isProdigyRun = isAutonomousMutant && !mutantWorthyOfBlend && aggregateFitness <= previousBest &&
-        sorted[0] >= Math.min(22000, (this.allTimePeakFitness || previousBest) * 0.55);
-
-      // Strict elitism with Consistency Gate:
-      if (aggregateFitness > this.bestFitness && passesConsistencyGate) {
-        this.stagnantGens = 0;
-        this.bestFitness = aggregateFitness;
-        this.allTimePeakFitness = Math.max(this.allTimePeakFitness || 0, aggregateFitness);
+      if (isNewChampion) {
+        this.stagnantGens = nextStagnantGens;
+        this.bestFitness = nextBestFitness;
+        this.allTimePeakFitness = nextPeakFitness;
         // Demote current champion to silver before crowning the new one
         if (this.championBrain) {
           this.silverBrain = NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
@@ -1162,47 +1154,31 @@ export class SlitherMLAgent {
         this.championBrain = NeuralNetwork.fromJSON(this.brain.export(), this.inputCount);
         console.log(`%c[SlitherML] 🏆 NEW CHAMPION (${origin})! Gen ${this.generation} — Best-2-of-3 aggregate ${Math.floor(aggregateFitness)} (mean ${Math.floor(meanFitness)}, median ${Math.floor(sorted[1])}), previous ${Math.floor(previousBest)}`, 'color: #00f5d4; font-weight: bold;');
       } else {
-        if (aggregateFitness > this.bestFitness && !passesConsistencyGate) {
-          console.log(`%c[SlitherML] ⚠️ Candidate aggregate ${Math.floor(aggregateFitness)} exceeded champion ${Math.floor(this.bestFitness)} but was rejected by Consistency Gate (median ${Math.floor(sorted[1])} < 40% of champ ${Math.floor(previousBest * 0.40)}).`, 'color: #ffb703;');
+        if (aggregateFitness > previousBest && !passesConsistencyGate) {
+          console.log(`%c[SlitherML] ⚠️ Candidate aggregate ${Math.floor(aggregateFitness)} exceeded champion ${Math.floor(previousBest)} but was rejected by Consistency Gate (median ${Math.floor(sorted[1])} < 40% of champ ${Math.floor(previousBest * 0.40)}).`, 'color: #ffb703;');
         }
-        this.stagnantGens = (this.stagnantGens || 0) + 1;
-        // Plateau relief: after 6 consecutive stagnant generations, gently ease bar by 0.5%
-        // (accelerating to 1.0% when stagnantGens >= 15) to prevent 1-in-1000 lucky spawn
-        // outliers from permanently freezing evolution.
-        // Adaptive Plateau Floor: Standard floor is 85% of peak fitness. When deep stagnation persists
-        // (>= 50 gens without a champion), ease to 75%, and at >= 60 gens ease to 70% or toward measured distribution
-        // to prevent infinite stagnation traps (e.g., Gen 134 at 67 stagnant gens or Gen 536 at 469 stagnant gens).
-        this.allTimePeakFitness = Math.max(this.allTimePeakFitness || 0, this.bestFitness);
-        const floorRatio = this.stagnantGens >= 60 ? 0.70 : (this.stagnantGens >= 50 ? 0.75 : 0.85);
-        let minBar = this.allTimePeakFitness * floorRatio;
-        if (this.stagnantGens >= 60) {
-          const targetFloor = measuredFloor !== null ? measuredFloor : 500;
-          if (minBar > targetFloor) {
-            minBar = Math.max(targetFloor, minBar * Math.pow(0.985, this.stagnantGens - 60));
-          }
+        this.stagnantGens = nextStagnantGens;
+        this.allTimePeakFitness = nextPeakFitness;
+        if (nextBestFitness < previousBest) {
+          const floorRatio = this.stagnantGens >= 60 ? 0.70 : (this.stagnantGens >= 50 ? 0.75 : 0.85);
+          const label = this.stagnantGens >= 15 ? 'Deep Plateau Relief' : 'Plateau Relief';
+          const pct = this.stagnantGens >= 15 ? '-1.0%' : '-0.5%';
+          console.log(`%c[SlitherML] 📉 ${label} (Stagnant Gen ${this.stagnantGens}): Fitness bar eased from ${previousBest.toFixed(1)} to ${nextBestFitness.toFixed(1)} (${pct}, floor ~${Math.round(floorRatio * 100)}%)`, 'color: #94a3b8;');
         }
-        if (this.stagnantGens >= 15) {
-          const decayed = Math.max(minBar, this.bestFitness * 0.990);
-          console.log(`%c[SlitherML] 📉 Deep Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-1.0%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');
-          this.bestFitness = decayed;
-        } else if (this.stagnantGens >= 6) {
-          const decayed = Math.max(minBar, this.bestFitness * 0.995);
-          console.log(`%c[SlitherML] 📉 Plateau Relief (Stagnant Gen ${this.stagnantGens}): Fitness bar gently eased from ${this.bestFitness.toFixed(1)} to ${decayed.toFixed(1)} (-0.5%${decayed === minBar ? `, capped at ${Math.round(floorRatio * 100)}% floor` : ''})`, 'color: #94a3b8;');
-          this.bestFitness = decayed;
-        }
+        this.bestFitness = nextBestFitness;
 
         // Fallback Silver Candidate: When no real displaced champion exists (or current silver
         // is also a mutant candidate), remember the best qualifying non-crowned autonomous mutant
         // (scoring >= 40% of champion, or achieving a prodigy run) as the silver candidate for genetic crossover.
-        if ((mutantWorthyOfBlend || isProdigyRun) && this.silverSource !== 'champion') {
+        if (silverUpdate && this.silverSource !== 'champion') {
           if (!this.silverBrain || aggregateFitness > (this.silverFitness || 0)) {
             this.silverBrain = NeuralNetwork.fromJSON(this.brain.export(), this.inputCount);
             if (this.silverBrain && this.silverBrain.biases && this.silverBrain.biases.length > 0) {
               const sOutB = this.silverBrain.biases[this.silverBrain.biases.length - 1];
               if (sOutB && sOutB.length > 0) sOutB[0] = Math.max(-0.15, Math.min(0.15, sOutB[0]));
             }
-            this.silverFitness = aggregateFitness;
-            this.silverSource = 'mutant';
+            this.silverFitness = silverUpdate.fitness;
+            this.silverSource = silverUpdate.source;
             console.log(`%c[SlitherML] 🥈 Silver candidate adopted: autonomous mutant scoring ${Math.floor(aggregateFitness)} (>= 40% of champ ${Math.floor(previousBest)}${isProdigyRun ? ' [Prodigy]' : ''}) saved for crossover recombination.`, 'color: #94a3b8; font-weight: bold;');
           }
         }
@@ -1240,79 +1216,37 @@ export class SlitherMLAgent {
       this.candidatePending = false;
       this.candidateSource = null;
 
-      // Breed the next genome with Anti-Stagnation Adaptive Mutation (from MEMWashburn/NEAT)
-      // and High-Fitness Annealed Mutation (for elite champions > 30000 fitness).
       if (this.championBrain) {
-        // Recombination: when stuck in a plateau for >= 5 gens and a silver brain
-        // exists, breed via uniform crossover(champion, silver) instead of a pure
-        // clone. This combines complementary sub-skills from two elite lineages and
-        // explores regions of weight-space that point-mutation alone cannot reach.
-        const useCrossover = this.stagnantGens >= 5 && this.silverBrain;
-        const baseBrain = useCrossover
-          ? NeuralNetwork.crossover(this.championBrain, this.silverBrain)
-          : NeuralNetwork.fromJSON(this.championBrain.export(), this.inputCount);
-        if (useCrossover) {
+        if (this.stagnantGens >= 5 && this.silverBrain) {
           console.log(`%c[SlitherML] 🧬 Recombination (Stagnant Gen ${this.stagnantGens}): breeding via crossover(champion, silver) to escape fitness plateau!`, 'color: #a855f7; font-weight: bold;');
         }
-        if (baseBrain) {
-          if ((mutantWorthyOfBlend || teacherWorthyOfBreedingBlend || isProdigyRun) && this.brain) {
-            let blendRatio = 0.15;
-            let blendReason = '';
-            if (teacherWorthyOfBreedingBlend) {
-              blendRatio = 0.15;
-              blendReason = `Preserving human tuition (${Math.floor(aggregateFitness)} aggregate): Blending 15% teacher candidate weights into mutant breeding template!`;
-            } else if (isProdigyRun) {
-              blendRatio = 0.20;
-              blendReason = `🌟 Prodigy single-run breakthrough (${Math.floor(sorted[0])} peak life, aggregate ${Math.floor(aggregateFitness)} vs champ ${Math.floor(this.bestFitness)}): Blending 20% weights into mutant breeding seed!`;
-            } else {
-              blendRatio = 0.15;
-              blendReason = `Autonomous mutant showed breakthrough performance (${Math.floor(aggregateFitness)} aggregate vs champ ${Math.floor(this.bestFitness)}). Blending 15% weights into mutant breeding template!`;
-            }
-            console.log(`%c[SlitherML] 🧬 ${blendReason}`, 'color: #a855f7; font-weight: bold;');
-            const candidateBrain = this.brain;
-            const keepRatio = 1.0 - blendRatio;
-            for (let layer = 0; layer < baseBrain.weights.length; layer++) {
-              const bW = baseBrain.weights[layer];
-              const cW = candidateBrain.weights[layer];
-              for (let j = 0; j < bW.length; j++) {
-                bW[j] = (bW[j] * keepRatio) + (cW[j] * blendRatio);
-              }
-              const bB = baseBrain.biases[layer];
-              const cB = candidateBrain.biases[layer];
-              for (let j = 0; j < bB.length; j++) {
-                bB[j] = (bB[j] * keepRatio) + (cB[j] * blendRatio);
-              }
-            }
-            if (baseBrain.biases && baseBrain.biases.length > 0) {
-              const baseOutB = baseBrain.biases[baseBrain.biases.length - 1];
-              if (baseOutB && baseOutB.length > 0) {
-                baseOutB[0] = Math.max(-0.15, Math.min(0.15, baseOutB[0]));
-              }
-            }
-          }
-
-          const isStagnant = this.stagnantGens >= 3;
-          const isDeepStagnant = this.stagnantGens >= 8;
-          const isElite = this.bestFitness > 30000;
-
-          let mutRate = isDeepStagnant ? 0.18 : (isStagnant ? 0.12 : 0.06);
-          let mutStrength = isDeepStagnant ? 0.35 : (isStagnant ? 0.28 : 0.16);
-
-          if (isElite) {
-            mutRate = isDeepStagnant ? 0.09 : (isStagnant ? 0.06 : 0.035);
-            mutStrength = isDeepStagnant ? 0.20 : (isStagnant ? 0.14 : 0.08);
-          }
-
-          if (isDeepStagnant) {
-            console.log(`%c[SlitherML] 🔥 Deep Stagnation Shake (Gen ${this.generation}, Stagnant ${this.stagnantGens}): Escalating mutation to escape deep local minimum (rate ${mutRate}, strength ${mutStrength}${isElite ? ', annealed' : ''})!`, 'color: #f43f5e; font-weight: bold;');
-          } else if (isStagnant) {
-            console.log(`%c[SlitherML] ⚡ Anti-Stagnation Activated (Gen ${this.generation}): Escalating mutation (rate ${mutRate}, strength ${mutStrength}${isElite ? ', annealed' : ''}) to escape local minima!`, 'color: #a855f7; font-weight: bold;');
-          }
-          baseBrain.mutate(mutRate, mutStrength);
-          this.brain = baseBrain;
+        if ((mutantWorthyOfBlend || teacherWorthyOfBreedingBlend || isProdigyRun) && this.brain) {
+          const blendReason = teacherWorthyOfBreedingBlend
+            ? `Preserving human tuition (${Math.floor(aggregateFitness)} aggregate): Blending 15% teacher candidate weights into mutant breeding template!`
+            : (isProdigyRun
+              ? `🌟 Prodigy single-run breakthrough (${Math.floor(sorted[0])} peak life, aggregate ${Math.floor(aggregateFitness)} vs champ ${Math.floor(this.bestFitness)}): Blending 20% weights into mutant breeding seed!`
+              : `Autonomous mutant showed breakthrough performance (${Math.floor(aggregateFitness)} aggregate vs champ ${Math.floor(this.bestFitness)}). Blending 15% weights into mutant breeding template!`);
+          console.log(`%c[SlitherML] 🧬 ${blendReason}`, 'color: #a855f7; font-weight: bold;');
         }
-      } else {
-        this.brain.mutate(0.08, 0.20);
+      }
+
+      const nextBrain = breedNextGenome({
+        championBrain: this.championBrain,
+        silverBrain: this.silverBrain,
+        candidateBrain: this.brain,
+        stagnantGens: this.stagnantGens,
+        bestFitness: this.bestFitness,
+        inputCount: this.inputCount,
+        blendOptions: {
+          mutantWorthyOfBlend,
+          teacherWorthyOfBreedingBlend,
+          isProdigyRun,
+          aggregateFitness,
+          peakLifeFitness: sorted[0]
+        }
+      });
+      if (nextBrain) {
+        this.brain = nextBrain;
       }
 
       this.currentEpisode = 1;
@@ -1320,34 +1254,37 @@ export class SlitherMLAgent {
       this._saveCheckpoint();
     }
 
+    _buildCheckpointData() {
+      const championExport = this.championBrain
+        ? this.championBrain.export()
+        : this.brain.export();
+      return {
+        brain: championExport,
+        activeBrain: this.brain.export(),
+        hasChampion: Boolean(this.championBrain),
+        silverBrain: this.silverBrain ? this.silverBrain.export() : null,
+        silverFitness: this.silverFitness || 0,
+        silverSource: this.silverSource || null,
+        bestFitness: this.bestFitness,
+        allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
+        generation: this.generation,
+        currentEpisode: this.currentEpisode,
+        episodeFitnesses: this.episodeFitnesses,
+        recentRollouts: this.recentRollouts,
+        candidatePending: this.candidatePending,
+        candidateSource: this.candidateSource,
+        kills: this.kills,
+        teacherSamples: this.teacherSamples,
+        allTimePeakLength: this.allTimePeakLength,
+        stagnantGens: this.stagnantGens,
+        telemetry: this.flightRecorder.getTelemetrySummary(),
+        timestamp: Date.now()
+      };
+    }
+
     _saveChampionWeights() {
       try {
-        const championExport = this.championBrain
-          ? this.championBrain.export()
-          : this.brain.export();
-        const activeExport = this.brain.export();
-        const data = {
-          brain: championExport,
-          activeBrain: activeExport,
-          hasChampion: Boolean(this.championBrain),
-          silverBrain: this.silverBrain ? this.silverBrain.export() : null,
-          silverFitness: this.silverFitness || 0,
-          silverSource: this.silverSource || null,
-          bestFitness: this.bestFitness,
-          allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
-          generation: this.generation,
-          currentEpisode: this.currentEpisode,
-          episodeFitnesses: this.episodeFitnesses,
-          candidatePending: this.candidatePending,
-          candidateSource: this.candidateSource,
-          kills: this.kills,
-          teacherSamples: this.teacherSamples,
-          allTimePeakLength: this.allTimePeakLength,
-          stagnantGens: this.stagnantGens,
-          telemetry: this.flightRecorder.getTelemetrySummary(),
-          timestamp: Date.now()
-        };
-        const serialized = JSON.stringify(data);
+        const serialized = JSON.stringify(this._buildCheckpointData());
         localStorage.setItem(STORAGE_KEY, serialized);
         if (typeof window.__slitherMLBridgeSave === 'function') {
           window.__slitherMLBridgeSave(serialized);
@@ -1368,27 +1305,6 @@ export class SlitherMLAgent {
   }
 
   exportCheckpoint() {
-    const data = {
-      brain: (this.championBrain || this.brain).export(),
-      activeBrain: this.brain.export(),
-      hasChampion: Boolean(this.championBrain),
-      silverBrain: this.silverBrain ? this.silverBrain.export() : null,
-      silverFitness: this.silverFitness || 0,
-      silverSource: this.silverSource || null,
-      bestFitness: this.bestFitness,
-      allTimePeakFitness: this.allTimePeakFitness || this.bestFitness,
-      generation: this.generation,
-      currentEpisode: this.currentEpisode,
-      episodeFitnesses: this.episodeFitnesses,
-      candidatePending: this.candidatePending,
-      candidateSource: this.candidateSource,
-      kills: this.kills,
-      teacherSamples: this.teacherSamples,
-      allTimePeakLength: this.allTimePeakLength,
-      stagnantGens: this.stagnantGens,
-      telemetry: this.flightRecorder.getTelemetrySummary(),
-      timestamp: Date.now()
-    };
-    return JSON.stringify(data, null, 2);
+    return JSON.stringify(this._buildCheckpointData(), null, 2);
   }
 }

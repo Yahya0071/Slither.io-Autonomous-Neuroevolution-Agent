@@ -3,7 +3,7 @@
 [![Node.js CI](https://github.com/Yahya0071/Slither.io-Autonomous-Neuroevolution-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Yahya0071/Slither.io-Autonomous-Neuroevolution-Agent/actions)
 ![Node Version](https://img.shields.io/badge/node-%3E%3D22.8-brightgreen)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-blue)
-![Tests](https://img.shields.io/badge/tests-146%20passing-success)
+![Tests](https://img.shields.io/badge/tests-154%20passing-success)
 
 > [!CAUTION]
 > **Educational & Research Purpose Only — Terms of Service Notice**
@@ -82,11 +82,11 @@ The tactical arbiter evaluates relative mass `ρ = scale_threat / scale_self`, l
 - **Multi-Episode Evaluation**: Evaluates each candidate genome over 3 separate episodes. Drops the single lowest score and averages the top 2: `Aggregate = (Run_top1 + Run_top2) / 2`.
 - **Consistency Gate**: Rejects single-life lucky flukes; requires median life fitness `Median ≥ 0.40 × previousBest`.
 - **Mulligan Filter**: Immediate respawn deaths (< 3.5s survival and score growth < 10) are discarded without penalizing candidate fitness.
-- **Plateau Relief & Floor**: When stagnant for ≥ 6 generations without a new champion, fitness bar eases by 0.5% per generation (accelerating to 1.0% at ≥ 15 generations). The decay is bounded from below by an adaptive floor based on all-time peak fitness:
+- **Plateau Relief & Floor**: When stagnant for ≥ 6 generations without a new champion, fitness bar eases by 0.5% per generation (accelerating to 1.0% at ≥ 15 generations). The decay is bounded from below by an adaptive floor based on all-time peak fitness, easing toward the measured upper-quartile (`Q3`) rollout distribution under prolonged stagnation:
   - Standard floor: **85%** of peak (`stagnantGens < 50`)
   - Intermediate floor: **75%** of peak (`50 ≤ stagnantGens < 60`)
-  - Deep relief floor: **70%** of peak (`stagnantGens ≥ 60`)
-- **Fast Evolutionary Programming (FEP)**: Mutations sample from a hybrid distribution (85% Gaussian micro-tuning + 15% Cauchy heavy-tailed perturbations) with Xavier fan-in scaling (`σ_l = σ_0 × √(24 / n_in)`).
+  - Deep relief floor: **70%** of peak, decaying toward measured `Q3` rollout performance (`stagnantGens ≥ 60`)
+- **Fast Evolutionary Programming (FEP)**: Mutations sample from a hybrid distribution (85% Gaussian micro-tuning + 15% Cauchy heavy-tailed perturbations) with Xavier fan-in scaling (`σ_l = σ_0 × √(24 / n_in)`) and a relative weight-norm cap (`‖ΔW‖ ≤ 0.08 · ‖W‖`) to prevent destructive policy shocks.
 - **Uniform Crossover & Silver Brain**: When stagnation reaches ≥ 5 generations and a qualifying secondary genome (displaced champion or mutant scoring ≥ 40% of champion) exists, offspring are bred via 50/50 uniform crossover between the champion and silver genomes.
 
 ### 2. Online Imitation Learning (Teacher Mode)
@@ -110,7 +110,7 @@ The tactical arbiter evaluates relative mass `ρ = scale_threat / scale_self`, l
 │   ├── controller.js             # SlitherMLController HUD, event bindings, canvas overlay
 │   └── index.js                  # Public API module export index
 ├── extension/                    # Manifest V3 Chrome/Edge extension
-├── tests/                        # Node.js built-in test runner test suite (146 tests)
+├── tests/                        # Node.js built-in test runner test suite (154 tests)
 ├── sim/                          # Offline headless simulation & analysis tools
 ├── docs/                         # Baseline, consistency audit, and evolution diagnosis
 ├── build.mjs                     # Zero-dependency bundler and artifact parity verifier

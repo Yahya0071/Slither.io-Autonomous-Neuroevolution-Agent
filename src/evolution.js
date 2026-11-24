@@ -119,8 +119,10 @@ export function breedNextGenome({
   } = blendOptions;
 
   if (!championBrain) {
-    const net = new NeuralNetwork(inputCount, [48, 24], 2);
-    net.mutate(0.08, 0.20);
+    const net = candidateBrain
+      ? NeuralNetwork.fromJSON(candidateBrain.export(), inputCount)
+      : new NeuralNetwork(inputCount, [48, 24], 2);
+    net.mutate(0.08, 0.20, 0.08);
     return net;
   }
 
@@ -169,6 +171,6 @@ export function breedNextGenome({
     mutStrength = isDeepStagnant ? 0.20 : (isStagnant ? 0.14 : 0.08);
   }
 
-  baseBrain.mutate(mutRate, mutStrength);
+  baseBrain.mutate(mutRate, mutStrength, 0.08);
   return baseBrain;
 }
