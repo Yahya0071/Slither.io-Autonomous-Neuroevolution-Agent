@@ -114,3 +114,57 @@ test('autonomous mutant is crowned new champion when bestFitness has decayed to 
   assert.ok(agent.silverBrain !== null, 'former champion should be demoted to silver');
   assert.equal(agent.silverFitness, 1200);
 });
+
+test('recentRollouts persists across exportCheckpoint, localStorage reload, and clears on resetBrain', () => {
+  const storage = new MemoryStorage();
+  const harness = loadAgent({ storage });
+  const agent = harness.newAgent();
+  agent.resetBrain();
+  agent.bestFitness = 1200;
+  agent.allTimePeakFitness = 1500;
+  agent.championBrain = harness.NeuralNetwork.fromJSON(agent.brain.export(), 32);
+
+  for (const score of [700, 950]) {
+    for (let ep = 0; ep < 3; ep++) {
+      agent.fitness = score;
+      agent.survivalTime = 30;
+      agent.onDeath(false);
+    }
+  }
+  assert.deepEqual(agent.recentRollouts, [700, 950]);
+
+  const exported = JSON.parse(agent.exportCheckpoint());
+  assert.deepEqual(exported.recentRollouts, [700, 950]);
+
+  const reloaded = harness.newAgent();
+  assert.deepEqual(reloaded.recentRollouts, [700, 950], 'recentRollouts must survive reload');
+
+  reloaded.resetBrain();
+  assert.deepEqual(reloaded.recentRollouts, [], 'resetBrain must clear recentRollouts');
+});
+
+test('NeuralNetwork.mutate with maxNormRatio bounds relative weight norm shift', () => {
+  const harness = loadAgent();
+  const { NeuralNetwork } = harness;
+  const net = new NeuralNetwork(32, [48, 24], 2);
+
+  const preWeights = net.weights.map(w => new Float32Array(w));
+  let preNormSq = 0;
+  for (const w of preWeights) {
+    for (let i = 0; i < w.length; i++) preNormSq += w[i] * w[i];
+  }
+  const preNorm = Math.sqrt(preNormSq);
+
+  // Aggressive mutation that would normally shift weights by >30%, capped at 8%
+  net.mutate(0.25, 0.45, 0.08);
+
+  let deltaSq = 0;
+  for (let l = 0; l < net.weights.length; l++) {
+    for (let i = 0; i < net.weights[l].length; i++) {
+      const d = net.weights[l][i] - preWeights[l][i];
+      deltaSq += d * d;
+    }
+  }
+  const relShift = Math.sqrt(deltaSq) / preNorm;
+  assert.ok(relShift <= 0.08 + 1e-6, `relative norm shift ${relShift.toFixed(4)} must be <= 0.08`);
+});

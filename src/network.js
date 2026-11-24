@@ -157,7 +157,17 @@ export class NeuralNetwork {
   // Fast Evolutionary Programming (FEP) Mutation:
   // Combines 85% Gaussian micro-tuning with 15% Cauchy heavy-tailed Lévy flights to escape local fitness valleys,
   // aligned by Xavier spectral fan-in scaling across layer depths.
-  mutate(rate = 0.06, strength = 0.16) {
+  // When maxNormRatio > 0, rescales total weight delta so ||ΔW|| <= maxNormRatio * ||W||.
+  mutate(rate = 0.06, strength = 0.16, maxNormRatio = 0) {
+    let preWeights = null;
+    let preNormSq = 0;
+    if (maxNormRatio > 0) {
+      preWeights = this.weights.map(w => {
+        for (let j = 0; j < w.length; j++) preNormSq += w[j] * w[j];
+        return new Float32Array(w);
+      });
+    }
+
     for (let i = 0; i < this.weights.length; i++) {
       const nIn = this.layerSizes[i];
       const fanInScale = Math.sqrt(24.0 / nIn);
@@ -202,6 +212,31 @@ export class NeuralNetwork {
         }
       }
     }
+
+    if (preWeights && preNormSq > 0) {
+      let deltaSq = 0;
+      for (let i = 0; i < this.weights.length; i++) {
+        const w = this.weights[i];
+        const pw = preWeights[i];
+        for (let j = 0; j < w.length; j++) {
+          const d = w[j] - pw[j];
+          deltaSq += d * d;
+        }
+      }
+      const maxDelta = maxNormRatio * Math.sqrt(preNormSq);
+      const deltaNorm = Math.sqrt(deltaSq);
+      if (deltaNorm > maxDelta && deltaNorm > 0) {
+        const scale = maxDelta / deltaNorm;
+        for (let i = 0; i < this.weights.length; i++) {
+          const w = this.weights[i];
+          const pw = preWeights[i];
+          for (let j = 0; j < w.length; j++) {
+            w[j] = Math.max(-6.0, Math.min(6.0, pw[j] + (w[j] - pw[j]) * scale));
+          }
+        }
+      }
+    }
+
     // Guarantee output steering bias remains strictly centered within hydrodynamic bounds [-0.15, 0.15]
     const lastBiases = this.biases[this.biases.length - 1];
     if (lastBiases && lastBiases.length > 0) {
